@@ -1,0 +1,15 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/_global-error/page": "/_global-error",
+  "/api/image/route": "/api/image",
+  "/api/read/[chapterId]/route": "/api/read/[chapterId]",
+  "/favicon.ico/route": "/favicon.ico",
+  "/api/comics/route": "/api/comics",
+  "/api/nyora-proxy/[...slug]/route": "/api/nyora-proxy/[...slug]",
+  "/bookmark/page": "/bookmark",
+  "/comic/[id]/chapter/[chapterId]/page": "/comic/[id]/chapter/[chapterId]",
+  "/comic/[id]/page": "/comic/[id]",
+  "/katalog/page": "/katalog",
+  "/page": "/",
+  "/search/page": "/search"
+}

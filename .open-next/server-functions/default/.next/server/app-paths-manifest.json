@@ -1,0 +1,15 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/_global-error/page": "app/_global-error/page.js",
+  "/api/image/route": "app/api/image/route.js",
+  "/api/read/[chapterId]/route": "app/api/read/[chapterId]/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/comics/route": "app/api/comics/route.js",
+  "/api/nyora-proxy/[...slug]/route": "app/api/nyora-proxy/[...slug]/route.js",
+  "/bookmark/page": "app/bookmark/page.js",
+  "/comic/[id]/chapter/[chapterId]/page": "app/comic/[id]/chapter/[chapterId]/page.js",
+  "/comic/[id]/page": "app/comic/[id]/page.js",
+  "/katalog/page": "app/katalog/page.js",
+  "/page": "app/page.js",
+  "/search/page": "app/search/page.js"
+}

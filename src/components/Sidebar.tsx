@@ -1,56 +1,139 @@
-import { Play, Star } from "lucide-react";
-import { recentChapters } from "@/data/mockData";
+import { Suspense } from "react";
+import Link from "next/link";
+import { connection } from "next/server";
+import { Star } from "lucide-react";
+import { getRecentChapters, getTopRatedManga } from "@/lib/mangadex";
 
-export default function Sidebar() {
+function SidebarSkeleton() {
   return (
-    <div className="space-y-8">
-      {/* RECENT CHAPTERS */}
-      <div className="bg-white p-4 rounded shadow-sm border border-gray-100">
-        <div className="flex justify-between border-b border-gray-200 pb-2 mb-3">
-          <h3 className="font-bold text-sm text-gray-900 uppercase tracking-wide">Chapter Terbaru</h3>
-          <button className="text-xs text-gray-400 hover:text-gray-900">Lihat Semua</button>
+    <div className="space-y-12 animate-pulse">
+      <div className="bg-gray-200 h-96 border-2 border-gray-300"></div>
+      <div className="bg-gray-200 h-[500px] border-2 border-gray-300"></div>
+    </div>
+  );
+}
+
+async function SidebarContent() {
+  await connection();
+
+  // Ambil Chapter Terbaru & Rating Tertinggi (Top 6 agar tidak ada ruang kosong)
+  const [recentChapters, topRated] = await Promise.all([
+    getRecentChapters(6),
+    getTopRatedManga(6), // <-- Diubah menjadi 6
+  ]);
+
+  return (
+    <div className="space-y-12">
+      
+      {/* ========================================= */}
+      {/* 1. CHAPTER TERBARU                        */}
+      {/* ========================================= */}
+      <div>
+        <div className="flex justify-between items-end border-b-2 border-gray-900 pb-3 mb-6">
+          <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">
+            Chapter Terbaru
+          </h2>
         </div>
-        <div className="space-y-4">
-          {recentChapters.map((ch, idx) => (
-            <div key={idx} className="flex gap-3 group cursor-pointer">
-              <div className="w-16 h-16 rounded overflow-hidden flex-shrink-0 relative">
-                <img src={ch.img} alt={ch.title} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                  <Play className="w-4 h-4 text-white fill-current" />
+
+        <div className="flex flex-col gap-6">
+          {recentChapters.length === 0 && (
+            <p className="font-mono text-xs text-gray-500 border-2 border-dashed border-gray-300 p-4 text-center">
+              Gagal memuat data.
+            </p>
+          )}
+          
+          {recentChapters.map((ch) => (
+            <Link
+              key={ch.chapterId}
+              href={`/comic/${ch.mangaId}/chapter/${ch.chapterId}`}
+              className="flex gap-6 group items-center"
+            >
+              {/* SAMPUL BESAR */}
+              <div className="w-24 h-36 md:w-32 md:h-48 flex-shrink-0 bg-white border-2 border-gray-900 shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all duration-300 group-hover:shadow-none group-hover:translate-x-[4px] group-hover:translate-y-[4px] overflow-hidden">
+                <img 
+                  src={`/api/image?url=${encodeURIComponent(ch.img)}`} 
+                  alt={ch.title} 
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500" 
+                />
+              </div>
+
+              {/* Teks Kanan */}
+              <div className="flex flex-col justify-center flex-1 min-w-0">
+                <h3 className="font-black text-lg md:text-2xl text-gray-900 uppercase leading-tight line-clamp-2 group-hover:text-amber-600 transition-colors mb-2 md:mb-3">
+                  {ch.title}
+                </h3>
+                
+                <div className="flex flex-wrap items-center gap-2 md:gap-3 font-mono text-xs md:text-sm uppercase tracking-widest text-gray-500">
+                  <span className="bg-white border-2 border-gray-300 px-2 py-0.5">
+                    {ch.chapter}
+                  </span>
+                  <span className="w-1.5 h-1.5 bg-gray-400"></span>
+                  <span className="font-bold text-gray-700">{ch.time}</span>
                 </div>
               </div>
-              <div className="flex flex-col justify-center">
-                <h4 className="text-sm font-bold leading-tight text-gray-800 group-hover:text-gray-500 transition">{ch.title}</h4>
-                <p className="text-xs text-gray-500 mt-1">{ch.chapter}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{ch.views}</p>
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
 
-      {/* COMIC OF THE WEEK */}
-      <div className="bg-white p-4 rounded shadow-sm border border-gray-100">
-        <div className="flex justify-between border-b border-gray-200 pb-2 mb-3">
-          <h3 className="font-bold text-sm text-gray-900 uppercase tracking-wide">Komik Minggu Ini</h3>
-        </div>
-        <div className="flex gap-3 mb-3">
-          <img src="https://images.unsplash.com/photo-1580477667995-2b94f01c9516?w=100&q=80" alt="Comic" className="w-20 h-28 object-cover rounded" />
-          <div>
-            <p className="text-xs text-gray-500">Action, Supernatural</p>
-            <h4 className="font-bold text-sm text-gray-800">Jujutsu Kaisen</h4>
-            <div className="flex text-gray-800 text-xs mt-1 mb-2">
-              {[...Array(5)].map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)}
-              <span className="text-gray-400 ml-1">(2.1k reviews)</span>
-            </div>
-            <div className="text-xs text-gray-500 space-y-0.5">
-              <p><strong className="text-gray-700">Status:</strong> Ongoing</p>
-              <p><strong className="text-gray-700">Author:</strong> Gege Akutami</p>
-            </div>
+      {/* ========================================= */}
+      {/* 2. RATING TERTINGGI (Top 6)               */}
+      {/* ========================================= */}
+      {topRated.length > 0 && (
+        <div>
+          <div className="flex justify-between items-end border-b-2 border-gray-900 pb-3 mb-6">
+            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-gray-900">
+              Rating Tertinggi
+            </h2>
+          </div>
+          
+          <div className="flex flex-col gap-6">
+            {topRated.map((manga, idx) => (
+              <Link key={manga.id} href={`/comic/${manga.id}`} className="flex gap-6 group items-center">
+                
+                {/* SAMPUL BESAR (Sama dengan Chapter Terbaru) */}
+                <div className="relative w-24 h-36 md:w-32 md:h-48 flex-shrink-0 bg-white border-2 border-gray-900 shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all duration-300 group-hover:shadow-none group-hover:translate-x-[4px] group-hover:translate-y-[4px] overflow-hidden">
+                  <img 
+                    src={`/api/image?url=${encodeURIComponent(manga.img)}`} 
+                    alt={manga.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500" 
+                  />
+                  {/* Badge Peringkat Kecil di Pojok Gambar */}
+                  <div className="absolute top-0 left-0 bg-gray-900 text-white font-black px-2 py-1 text-xs z-10 border-b-2 border-r-2 border-white">
+                    #{idx + 1}
+                  </div>
+                </div>
+
+                {/* Teks Kanan (Diperbesar) */}
+                <div className="flex flex-col justify-center flex-1 min-w-0">
+                  <h3 className="font-black text-lg md:text-2xl text-gray-900 uppercase leading-tight line-clamp-2 group-hover:text-amber-600 transition-colors mb-2 md:mb-3">
+                    {manga.title}
+                  </h3>
+                  
+                  {/* Info Bintang & Followers */}
+                  <div className="flex flex-wrap items-center gap-2 md:gap-3 font-mono text-xs md:text-sm uppercase tracking-widest text-gray-500">
+                    <div className="flex text-amber-500">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className={`w-4 h-4 ${i < manga.rating ? "fill-current" : "text-gray-300"}`} />
+                      ))}
+                    </div>
+                    <span className="w-1.5 h-1.5 bg-gray-400"></span>
+                    <span className="font-bold text-gray-700">{manga.followers} Follower</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
-        <button className="w-full border border-gray-900 text-gray-900 py-1.5 rounded text-sm font-semibold hover:bg-gray-100 transition">Tambah ke Koleksi</button>
-      </div>
+      )}
     </div>
+  );
+}
+
+export default function Sidebar() {
+  return (
+    <Suspense fallback={<SidebarSkeleton />}>
+      <SidebarContent />
+    </Suspense>
   );
 }

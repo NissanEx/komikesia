@@ -1,0 +1,133 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/nyora-proxy/[...slug]",
+      "regex": "^/api/nyora\\-proxy/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/api/nyora\\-proxy/(?<nxtPslug>.+?)(?:/)?$"
+    },
+    {
+      "page": "/api/read/[chapterId]",
+      "regex": "^/api/read/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPchapterId": "nxtPchapterId"
+      },
+      "namedRegex": "^/api/read/(?<nxtPchapterId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/comic/[id]",
+      "regex": "^/comic/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/comic/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/comic/[id]/chapter/[chapterId]",
+      "regex": "^/comic/([^/]+?)/chapter/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPchapterId": "nxtPchapterId"
+      },
+      "namedRegex": "^/comic/(?<nxtPid>[^/]+?)/chapter/(?<nxtPchapterId>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/comics",
+      "regex": "^/api/comics(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/comics(?:/)?$"
+    },
+    {
+      "page": "/api/image",
+      "regex": "^/api/image(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/image(?:/)?$"
+    },
+    {
+      "page": "/bookmark",
+      "regex": "^/bookmark(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/bookmark(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/katalog",
+      "regex": "^/katalog(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/katalog(?:/)?$"
+    },
+    {
+      "page": "/search",
+      "regex": "^/search(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/search(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

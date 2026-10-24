@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/nyora-proxy/[...slug]/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"/mnt/SteamSSD/komiksetya/src/app/api/nyora-proxy/[...slug]/route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

@@ -1,85 +1,289 @@
 "use client";
 
-import { useState } from "react";
-import { Star, BookOpen } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Loader2, Database } from "lucide-react";
 
-export default function ComicGrid({ initialComics }: { initialComics: any[] }) {
+type ComicItem = {
+  id: string;
+  title: string;
+  type: string;
+  img: string;
+  rating?: number;
+  readers: string;
+  chapters: string;
+  source?: "mangadex" | "komiktap" | "anilist"; 
+};
+
+const ITEMS_PER_PAGE = 20;
+
+export default function ComicGrid({ initialComics, total }: { initialComics: ComicItem[], total?: number }) {
   const [activeCategory, setActiveCategory] = useState("Semua");
-  const categories = ["Semua", "Manga", "Manhwa", "Manhua"];
+  const [activeSort, setActiveSort] = useState("Populer");
+  const [activeSource, setActiveSource] = useState("Semua");
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // State untuk data yang sedang ditampilkan
+  const [comics, setComics] = useState<ComicItem[]>(initialComics.slice(0, ITEMS_PER_PAGE));
+  const [totalItems, setTotalItems] = useState<number>(total || initialComics.length);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Filter data berdasarkan state
-  const filteredComics = activeCategory === "Semua" 
-    ? initialComics 
-    : initialComics.filter((comic) => comic.type === activeCategory);
+  const topGridRef = useRef<HTMLDivElement>(null);
+  const categories = ["Semua", "Manga", "Manhwa", "Manhua"];
+  const sources = ["Semua", "MangaDex", "Komiktap", "AniList"];
+
+  const normalizeType = (type: string | undefined | null) => {
+    if (!type) return "Manga";
+    const t = type.toLowerCase().trim();
+    if (t.includes("manhwa") || t.includes("korea") || t.includes("kr") || t.includes("webtoon")) return "Manhwa";
+    if (t.includes("manhua") || t.includes("china") || t.includes("cn") || t.includes("tw")) return "Manhua";
+    return "Manga";
+  };
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+
+  useEffect(() => {
+    // KONDISI 1: JIKA KONDISI AWAL (Halaman 1, Filter Default), GUNAKAN DATA DARI SERVER (SSR)
+    if (currentPage === 1 && activeCategory === "Semua" && activeSort === "Populer" && activeSource === "Semua") {
+      if (initialComics.length > 0) {
+        setComics(initialComics.slice(0, ITEMS_PER_PAGE));
+        setTotalItems(total || initialComics.length);
+        setIsLoading(false);
+        return; // Hentikan eksekusi, tidak perlu fetch API
+      }
+    }
+
+    // KONDISI 2: JIKA FILTER BERUBAH, AMBIL DATA DARI API
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/comics?page=${currentPage}&limit=${ITEMS_PER_PAGE}&category=${activeCategory}&sort=${activeSort}&source=${activeSource}&t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        
+        if (!res.ok) throw new Error("Gagal mengambil data");
+        
+        const json = await res.json();
+        const safeData = (json.data || []).slice(0, ITEMS_PER_PAGE);
+
+        setComics(safeData);
+        setTotalItems(json.total || 0);
+      } catch (error) {
+        console.error("API Error:", error);
+        // Jika gagal, kosongkan grid agar tidak menampilkan data lama yang salah
+        setComics([]); 
+        setTotalItems(0);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [currentPage, activeCategory, activeSort, activeSource, initialComics, total]);
+
+  const handleFilterChange = (type: "category" | "sort" | "source", value: string) => {
+    if (type === "category") setActiveCategory(value);
+    if (type === "sort") setActiveSort(value);
+    if (type === "source") setActiveSource(value);
+    setCurrentPage(1); // Selalu reset ke halaman 1 saat filter berubah
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    // Scroll ke atas Grid komik
+    if (topGridRef.current) {
+      const yOffset = -100; 
+      const y = topGridRef.current.getBoundingClientRect().top + window.scrollY + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  };
 
   return (
-    <div>
-      {/* TABS KATEGORI */}
-      <div className="flex gap-6 border-b border-gray-200 mb-6 text-sm font-semibold">
-        {categories.map((category) => (
-          <button
-            key={category}
-            onClick={() => setActiveCategory(category)}
-            className={`pb-2 transition-colors ${
-              activeCategory === category
-                ? "text-gray-900 border-b-2 border-gray-900"
-                : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            {category}
-          </button>
-        ))}
-      </div>
+    <div className="w-full relative" ref={topGridRef}>
       
-      {/* GRID KOMIK */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {filteredComics.length > 0 ? (
-          filteredComics.map((comic) => (
-            <Link href={`/comic/${comic.id}`} key={comic.id}>
-              <div className="bg-white rounded shadow-sm overflow-hidden group cursor-pointer border border-gray-100 hover:border-gray-300 transition h-full flex flex-col">
-                <div className="relative aspect-[3/4] overflow-hidden">
-                  <img 
-                    src={comic.img} 
-                    alt={comic.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
-                  />
-                  <div className="absolute top-2 right-2 bg-gray-900 text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
-                    {comic.type}
+      {/* HEADER: KATEGORI, SUMBER, & SORTIR */}
+      <div className="flex flex-row items-center justify-between gap-2 mb-8 border-b-2 border-gray-900 pb-4">
+        
+        {/* Tabs Kategori (Mobile Scrollable) */}
+        <div className="flex flex-row items-center gap-1 md:gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+          {categories.map((category) => (
+            <button
+              key={category}
+              onClick={() => handleFilterChange("category", category)}
+              disabled={isLoading}
+              className={`whitespace-nowrap px-2 md:px-4 py-1.5 md:py-2 font-mono text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all ${
+                activeCategory === category
+                  ? "bg-gray-900 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.3)]"
+                  : "bg-white border-2 border-gray-300 text-gray-500 hover:border-gray-900 hover:text-gray-900"
+              } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+
+        {/* Dropdown Filter (Desktop) */}
+        <div className="hidden md:flex items-center gap-2 shrink-0">
+          <Database className="w-4 h-4 text-gray-500" />
+          <select
+            value={activeSource}
+            onChange={(e) => handleFilterChange("source", e.target.value)}
+            disabled={isLoading}
+            className="bg-white border-2 border-gray-900 text-gray-900 font-mono text-xs font-bold uppercase tracking-widest px-3 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-amber-500"
+          >
+            {sources.map((src) => (
+              <option key={src} value={src}>{src}</option>
+            ))}
+          </select>
+
+          <SlidersHorizontal className="w-4 h-4 text-gray-500 ml-2" />
+          <select
+            value={activeSort}
+            onChange={(e) => handleFilterChange("sort", e.target.value)}
+            disabled={isLoading}
+            className="bg-white border-2 border-gray-900 text-gray-900 font-mono text-xs font-bold uppercase tracking-widest px-3 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-amber-500"
+          >
+            <option value="Populer">Paling Populer</option>
+            <option value="Rating">Rating Tertinggi</option>
+            <option value="A-Z">Urut A - Z</option>
+          </select>
+        </div>
+
+        {/* Ikon Filter (Mobile) */}
+        <div className="flex md:hidden items-center gap-2 shrink-0">
+          {/* Tombol Sumber */}
+          <div className="relative">
+            <select
+              value={activeSource}
+              onChange={(e) => handleFilterChange("source", e.target.value)}
+              disabled={isLoading}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            >
+              {sources.map((src) => (
+                <option key={src} value={src}>{src}</option>
+              ))}
+            </select>
+            <div className={`w-8 h-8 flex items-center justify-center border-2 border-gray-900 shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-colors ${activeSource !== "Semua" ? "bg-blue-400" : "bg-white"} ${isLoading ? "opacity-50" : ""}`}>
+              <Database className="w-4 h-4 text-gray-900" />
+            </div>
+          </div>
+
+          {/* Tombol Sortir */}
+          <div className="relative">
+            <select
+              value={activeSort}
+              onChange={(e) => handleFilterChange("sort", e.target.value)}
+              disabled={isLoading}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            >
+              <option value="Populer">Paling Populer</option>
+              <option value="Rating">Rating Tertinggi</option>
+              <option value="A-Z">Urut A - Z</option>
+            </select>
+            <div className={`w-8 h-8 flex items-center justify-center border-2 border-gray-900 shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-colors ${activeSort !== "Populer" ? "bg-amber-400" : "bg-white"} ${isLoading ? "opacity-50" : ""}`}>
+              <SlidersHorizontal className="w-4 h-4 text-gray-900" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* AREA GRID KOMIK */}
+      <div className="relative min-h-[500px]">
+        
+        {/* Indikator Loading */}
+        {isLoading && (
+          <div className="absolute inset-0 z-10 bg-[#f4f4f4]/80 flex flex-col items-center justify-center border-2 border-dashed border-gray-300">
+            <Loader2 className="w-10 h-10 animate-spin text-amber-500 mb-4" />
+            <p className="font-mono text-sm uppercase tracking-widest text-gray-900 font-bold bg-white px-4 py-2 border-2 border-gray-900 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+              Memuat {activeSource}...
+            </p>
+          </div>
+        )}
+
+        {/* Render Komik */}
+        {comics.length > 0 ? (
+          <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 transition-opacity duration-300 ${isLoading ? "opacity-30" : "opacity-100"}`}>
+            {comics.map((comic) => (
+              <Link href={`/comic/${comic.id}`} key={comic.id} className="group">
+                <div className="bg-white border-2 border-gray-900 flex flex-col h-full transition-all duration-300 group-hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] group-hover:-translate-y-1 group-hover:-translate-x-1">
+                  
+                  {/* Gambar Sampul */}
+                  <div className="relative aspect-[3/4] overflow-hidden border-b-2 border-gray-900 bg-gray-100">
+                    <img
+                      src={`/api/image?url=${encodeURIComponent(comic.img)}`}
+                      alt={comic.title}
+                      className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute top-0 right-0 bg-gray-900 text-white font-mono text-[10px] font-bold px-2 py-1 uppercase tracking-widest">
+                      {normalizeType(comic.type)}
+                    </div>
+                    {comic.source && comic.source !== "mangadex" && (
+                      <div className={`absolute top-0 left-0 text-white font-mono text-[10px] font-bold px-2 py-1 uppercase tracking-widest ${comic.source === "komiktap" ? "bg-amber-500" : "bg-blue-600"}`}>
+                        {comic.source}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Teks Info */}
+                  <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight uppercase line-clamp-2 mb-2 group-hover:text-amber-600 transition-colors" title={comic.title}>
+                        {comic.title}
+                      </h3>
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono uppercase tracking-widest">
+                        <span>{comic.source === "komiktap" ? "Ch." : "Vol."} {comic.chapters !== "?" ? comic.chapters : "01"}</span>
+                        <span className="w-1 h-1 bg-gray-400 rounded-none"></span>
+                        <span>{comic.readers} Follower</span>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
-                <div className="p-3 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="font-bold text-sm truncate text-gray-800 mb-1" title={comic.title}>
-                      {comic.title}
-                    </h3>
-                    <div className="flex text-gray-800 text-xs mb-3">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`w-3 h-3 ${i < comic.rating ? 'fill-current' : 'text-gray-300'}`} />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex border-t border-gray-100 pt-2 text-center text-xs">
-                    <div className="flex-1 border-r border-gray-100 flex flex-col items-center justify-center">
-                      <BookOpen className="w-3 h-3 text-gray-400 mb-1" />
-                      <span className="font-bold block text-gray-900">{comic.chapters}</span>
-                      <span className="text-gray-400">Chapters</span>
-                    </div>
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                      <span className="font-bold block text-gray-900">{comic.readers}</span>
-                      <span className="text-gray-400">Followers</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))
+              </Link>
+            ))}
+          </div>
         ) : (
-          <div className="col-span-full py-10 text-center text-gray-500">
-            Belum ada komik dengan kategori <strong>{activeCategory}</strong> (atau koneksi ke API gagal).
+          // Tampilan Jika Kosong
+          <div className="w-full py-20 text-center border-2 border-dashed border-gray-300 bg-white">
+            <p className="text-gray-500 font-mono text-sm uppercase tracking-widest">
+              Tidak ada komik untuk sumber <strong>{activeSource}</strong>.
+            </p>
           </div>
         )}
       </div>
+
+      {/* PAGINATION BAR */}
+      {!isLoading && comics.length > 0 && (
+        <div className="mt-12 pt-6 border-t-2 border-gray-900 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="font-mono text-sm text-gray-600 font-bold uppercase tracking-widest">
+            Menampilkan {comics.length} dari <strong>{totalItems}</strong> komik 
+            {activeSource !== "Semua" ? ` (${activeSource})` : ""}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+              disabled={currentPage === 1 || isLoading}
+              className="bg-white border-2 border-gray-900 text-gray-900 p-2 font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-900 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="bg-gray-900 text-white font-mono text-sm font-bold px-4 py-2 border-2 border-gray-900">
+              HALAMAN {currentPage} / {totalPages}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+              disabled={currentPage === totalPages || isLoading}
+              className="bg-white border-2 border-gray-900 text-gray-900 p-2 font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-900 hover:text-white transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

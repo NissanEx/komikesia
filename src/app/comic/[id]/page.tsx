@@ -1,144 +1,445 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowLeft, BookOpen } from "lucide-react";
-import { getMangaById, getMangaChapters } from "@/lib/mangadex";
+import { connection } from "next/server";
+import { Plus, ArrowRight } from "lucide-react";
+import {
+  getMangaById,
+  getMangaChapters,
+  getTitleCandidates,
+  pickTitle,
+  getMangaBySearch,
+} from "@/lib/mangadex";
+import { getComickChapters } from "@/lib/comick";
+import { getKomiktapChapters, getKomiktapMangaDetail } from "@/lib/komiktap";
+import { getAnilistMangaById } from "@/lib/anilist";
+import ChapterList from "@/components/ChapterList";
+import BookmarkButton from "@/components/BookmarkButton";
+import Header from "@/components/Header"; 
 
-// 1. Komponen terpisah untuk mengambil dan menampilkan data (Async Component)
-async function ComicDetails({ id }: { id: string }) {
-  const mangaData = await getMangaById(id);
-  const chaptersData = await getMangaChapters(id);
+type ChapterItem = {
+  id: string;
+  attributes: {
+    chapter: string | null;
+    title: string | null;
+    publishAt: string | null;
+    translatedLanguage: string;
+    nyoraSource: string | null;
+    nyoraMangaUrl: string | null;
+    sourceName: string;
+  };
+};
 
-  if (!mangaData || !mangaData.data) {
-    return (
-      <div className="text-center py-20">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Gagal Memuat Data</h1>
-        <p className="text-gray-500 mb-6">Komik tidak ditemukan atau koneksi ke server terputus.</p>
-        <Link href="/" className="bg-gray-900 text-white px-6 py-2 rounded hover:bg-gray-700 transition">
-          Kembali ke Beranda
-        </Link>
+function countLanguages(chapters: ChapterItem[]) {
+  const languages: Record<string, number> = {};
+  for (const c of chapters) {
+    const lang = c.attributes.translatedLanguage;
+    languages[lang] = (languages[lang] ?? 0) + 1;
+  }
+  return languages;
+}
+
+// Deteksi ID AniList (dilindungi try/catch agar tidak crash jika URL aneh)
+function parseAnilistId(id: string): number | null {
+  try {
+    const decoded = decodeURIComponent(id);
+    if (!decoded.startsWith("anilist:") && !decoded.startsWith("anilist-")) return null;
+    const raw = decoded.replace(/^anilist[:-]/, "");
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+// ==========================================
+// 1a. Info Komik MangaDex
+// ==========================================
+function ComicInfo({ manga }: { manga: any }) {
+  const title = pickTitle(manga);
+  const descObj = manga.attributes.description || {};
+  const description = descObj.en || descObj.id || Object.values(descObj)[0] || "Belum ada deskripsi.";
+
+  const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
+  const coverUrl = coverArt?.attributes?.fileName
+    ? `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`
+    : "https://via.placeholder.com/400x600?text=No+Image";
+
+  const tags = manga.attributes.tags.slice(0, 3).map((t: any) => t.attributes.name.en).join(" · ");
+
+  return (
+    <div className="relative w-full border-b border-gray-300 pb-12 mb-8">
+      <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 text-gray-300"><Plus className="w-6 h-6" /></div>
+      <div className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 text-gray-300"><Plus className="w-6 h-6" /></div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
+        <div className="lg:col-span-7 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-4 text-xs font-mono uppercase tracking-widest text-gray-500 mb-6 border-b border-gray-300 pb-2">
+              <span>ID: {manga.id.slice(0, 8)}</span>
+              <span>{manga.attributes.year || "TBA"}</span>
+              <span>{manga.attributes.status}</span>
+            </div>
+
+            <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-[0.85] text-gray-900 mb-6 break-words">
+              {title}
+            </h1>
+
+            <p className="font-serif text-xl text-gray-700 italic max-w-xl mb-8 border-l-4 border-amber-500 pl-4">
+              {description.slice(0, 150)}...
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <p className="text-sm font-bold tracking-widest uppercase text-gray-500">{tags}</p>
+            <div className="flex flex-wrap gap-4 items-center">
+              <a href="#chapter-list" className="bg-[#d97706] hover:bg-[#b45309] text-white font-mono font-bold uppercase tracking-widest py-3 px-8 flex items-center gap-3 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1">
+                Baca Komik <ArrowRight className="w-4 h-4" />
+              </a>
+              <BookmarkButton 
+                comic={{
+                  id: manga.id,
+                  title: title,
+                  img: coverUrl,
+                  type: manga.attributes.originalLanguage === "ko" ? "Manhwa" : "Manga",
+                  chapters: manga.attributes.lastChapter || "?",
+                  readers: "0"
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 relative group">
+          <div className="absolute inset-0 border border-gray-400 translate-x-3 translate-y-3 pointer-events-none"></div>
+          <div className="overflow-hidden border border-gray-900 relative z-10">
+            <img src={`/api/image?url=${encodeURIComponent(coverUrl)}`} alt={title} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
+          </div>
+          <div className="absolute top-4 -left-4 bg-white border border-gray-900 px-3 py-1 font-mono text-sm shadow-[2px_2px_0px_rgba(0,0,0,1)] z-20">
+            ★ {manga.attributes.tags.length || "N/A"} STATS
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 1b. Info Komik Komiktap
+// ==========================================
+function KomiktapComicInfo({ manga }: { manga: any }) {
+  return (
+    <div className="relative w-full border-b border-gray-300 pb-12 mb-8">
+      <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 text-gray-300"><Plus className="w-6 h-6" /></div>
+      <div className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 text-gray-300"><Plus className="w-6 h-6" /></div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
+        <div className="lg:col-span-7 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-4 text-xs font-mono uppercase tracking-widest text-gray-500 mb-6 border-b border-gray-300 pb-2">
+              <span className="bg-amber-500 text-white px-2 py-0.5">KOMIKTAP</span>
+              <span>SOURCE</span>
+            </div>
+
+            <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-[0.85] text-gray-900 mb-6 break-words">
+              {manga.title}
+            </h1>
+
+            <p className="font-serif text-xl text-gray-700 italic max-w-xl mb-8 border-l-4 border-amber-500 pl-4">
+              {manga.description || "Belum ada deskripsi."}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-wrap gap-4 items-center">
+              <a href="#chapter-list" className="bg-[#d97706] hover:bg-[#b45309] text-white font-mono font-bold uppercase tracking-widest py-3 px-8 flex items-center gap-3 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1">
+                Baca Komik <ArrowRight className="w-4 h-4" />
+              </a>
+              <BookmarkButton 
+                comic={{
+                  id: manga.id,
+                  title: manga.title,
+                  img: manga.img,
+                  type: manga.type || "Manga",
+                  chapters: "?",
+                  readers: "0"
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 relative group">
+          <div className="absolute inset-0 border border-gray-400 translate-x-3 translate-y-3 pointer-events-none"></div>
+          <div className="overflow-hidden border border-gray-900 relative z-10">
+            <img src={`/api/image?url=${encodeURIComponent(manga.img)}`} alt={manga.title} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 1c. Info Komik AniList
+// ==========================================
+function AnilistComicInfo({ manga }: { manga: any }) {
+  const status = (manga.status as string) || "UNKNOWN";
+  const description = manga.description || "Belum ada deskripsi.";
+  const genres = (manga.genres as string[]) ?? [];
+  const authors = (manga.staff?.nodes ?? []).map((s: any) => s.name.full);
+
+  return (
+    <div className="relative w-full border-b border-gray-300 pb-12 mb-8">
+      <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 text-gray-300"><Plus className="w-6 h-6" /></div>
+      <div className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 text-gray-300"><Plus className="w-6 h-6" /></div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
+        <div className="lg:col-span-7 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-4 text-xs font-mono uppercase tracking-widest text-gray-500 mb-6 border-b border-gray-300 pb-2">
+              <span className="bg-blue-600 text-white px-2 py-0.5">ANILIST</span>
+              <span>ID: {manga.id}</span>
+              <span>{manga.startDate?.year || "TBA"}</span>
+              <span>{status}</span>
+            </div>
+
+            <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-[0.85] text-gray-900 mb-6 break-words">
+              {manga.title}
+            </h1>
+
+            <p className="font-serif text-xl text-gray-700 italic max-w-xl mb-8 border-l-4 border-amber-500 pl-4">
+              {description.slice(0, 200)}{description.length > 200 ? "..." : ""}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <p className="text-sm font-bold tracking-widest uppercase text-gray-500">
+              {genres.slice(0, 3).join(" · ") || "-"}
+            </p>
+            <p className="text-xs font-mono uppercase text-gray-500">
+              Author: {authors.join(", ") || "-"} {manga.volumes ? ` · ${manga.volumes} Vol` : ""}
+            </p>
+            <div className="flex flex-wrap gap-4 items-center">
+              <a href="#chapter-list" className="bg-[#d97706] hover:bg-[#b45309] text-white font-mono font-bold uppercase tracking-widest py-3 px-8 flex items-center gap-3 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1">
+                Cari Chapter <ArrowRight className="w-4 h-4" />
+              </a>
+              <BookmarkButton 
+                comic={{
+                  id: `anilist:${manga.id}`,
+                  title: manga.title,
+                  img: manga.coverImage,
+                  type: "Manga",
+                  chapters: "?",
+                  readers: "0"
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-5 relative group">
+          <div className="absolute inset-0 border border-gray-400 translate-x-3 translate-y-3 pointer-events-none"></div>
+          <div className="overflow-hidden border border-gray-900 relative z-10 bg-gray-100">
+            <img src={`/api/image?url=${encodeURIComponent(manga.coverImage)}`} alt={manga.title} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
+          </div>
+          <div className="absolute top-4 -left-4 bg-white border border-gray-900 px-3 py-1 font-mono text-sm shadow-[2px_2px_0px_rgba(0,0,0,1)] z-20">
+            ★ {manga.averageScore || 0}/10
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 2. Daftar Chapter
+// ==========================================
+async function ComicChapters({ id, titles, lastChapter }: { id: string; titles: string[]; lastChapter: string | null; }) {
+  await connection();
+
+  let finalChapters: ChapterItem[] = [];
+  let finalLanguages: Record<string, number> = {};
+  let isFallback = false;
+  let usedSourceName = "";
+
+  try {
+    const komiktapData = await getKomiktapChapters(titles); 
+    if (komiktapData && komiktapData.chapters.length > 0) {
+      isFallback = true;
+      usedSourceName = "Komiktap";
+      finalChapters = komiktapData.chapters.map((c: any) => ({
+        id: c.id, attributes: { chapter: c.chapter, title: c.title, publishAt: c.publishAt, translatedLanguage: "id", nyoraSource: "komiktap", nyoraMangaUrl: komiktapData.mangaUrl, sourceName: "Komiktap" }
+      }));
+    }
+  } catch (err) {}
+
+  if (finalChapters.length === 0) {
+    try {
+      const comickData = await getComickChapters(titles); 
+      if (comickData && comickData.chapters.length > 0) {
+        isFallback = true;
+        usedSourceName = comickData.chapters[0].source || "Comick";
+        finalChapters = comickData.chapters.map((c: any) => ({
+          id: c.id, attributes: { chapter: c.chapter, title: c.title, publishAt: c.publishAt, translatedLanguage: "en", nyoraSource: comickData.sourceId, nyoraMangaUrl: comickData.mangaUrl, sourceName: usedSourceName }
+        }));
+      }
+    } catch (err) {}
+  }
+
+  if (finalChapters.length === 0 && id !== "unknown" && id !== "") {
+    try {
+      const chaptersData = await getMangaChapters(id);
+      finalChapters = (chaptersData?.data ?? []).map((c: any) => ({
+        id: c.id, attributes: { chapter: c.attributes.chapter ?? null, title: c.attributes.title ?? null, publishAt: c.attributes.publishAt ?? null, translatedLanguage: c.attributes.translatedLanguage || "en", nyoraSource: null, nyoraMangaUrl: null, sourceName: "MangaDex" }
+      }));
+      usedSourceName = "MangaDex";
+    } catch (err) {}
+  }
+
+  finalChapters.sort((a, b) => (parseFloat(b.attributes.chapter || "0") || 0) - (parseFloat(a.attributes.chapter || "0") || 0));
+  finalLanguages = countLanguages(finalChapters);
+
+  return (
+    <div id="chapter-list" className="mt-12">
+      <div className="flex items-end justify-between border-b-2 border-gray-900 pb-4 mb-6">
+        <h2 className="text-3xl font-black uppercase tracking-tighter">Indeks Chapter</h2>
+        <span className="font-mono text-sm bg-gray-900 text-white px-3 py-1">TOTAL: {finalChapters.length}</span>
+      </div>
+
+      {isFallback && (
+        <div className="bg-white border-l-4 border-amber-500 p-4 mb-6 flex items-start gap-3 shadow-sm">
+          <span className="text-lg">ℹ️</span>
+          <p className="text-gray-800 font-medium text-sm">Daftar chapter diambil dari sumber alternatif (<strong>{usedSourceName}</strong>).</p>
+        </div>
+      )}
+
+      {finalChapters.length === 0 ? (
+        <div className="text-center py-12 border border-dashed border-gray-400 bg-gray-100">
+          <p className="text-gray-500 font-mono text-sm uppercase">Tidak ada chapter tersedia di sumber manapun.</p>
+        </div>
+      ) : (
+        <div className="border border-gray-300 bg-white">
+          <ChapterList chapters={finalChapters} mangaId={id} languages={finalLanguages} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// 3. Wrapper Params (Anti-Crash Ekstrem)
+// ==========================================
+async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }> }) {
+  let id = "";
+  try {
+    const resolvedParams = await params;
+    id = resolvedParams.id;
+  } catch (e) {
+    return <ErrorState msg="ID Parameter tidak valid." />;
+  }
+
+  let decodedId = id;
+  try { decodedId = decodeURIComponent(id); } catch (e) {}
+
+  const anilistId = parseAnilistId(id);
+
+  // ROUTE ANILIST
+  if (anilistId !== null) {
+    let manga = null;
+    try { manga = await getAnilistMangaById(anilistId); } catch (e) {}
+    if (!manga) return <ErrorState msg="Data AniList Terputus" />;
+
+    let matchId = "unknown";
+    let matchTitle = manga.title;
+    try {
+      const results = await getMangaBySearch(manga.title);
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      const target = norm(manga.title);
+      const candidate = results.find((r) => norm(r.title) === target) || results.find((r) => norm(r.title).includes(target)) || results[0];
+      if (candidate) { matchId = candidate.id; matchTitle = candidate.title; }
+    } catch (err) {}
+
+    return (
+      <>
+        <AnilistComicInfo manga={manga} />
+        <Suspense fallback={<LoadingState />}>
+          <ComicChapters id={matchId} titles={[matchTitle, manga.title]} lastChapter={null} />
+        </Suspense>
+      </>
     );
   }
 
-  const manga = mangaData.data;
-  const title = manga.attributes.title.en || manga.attributes.title["ja-ro"] || "Judul Tidak Diketahui";
-  const description = manga.attributes.description.en || "Belum ada deskripsi untuk komik ini.";
-  
-  const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
-  const coverUrl = coverArt 
-    ? `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}` 
-    : "https://via.placeholder.com/400x600?text=No+Image";
+  // ROUTE KOMIKTAP
+  if (decodedId.startsWith("komiktap:")) {
+    const komiktapUrl = decodedId.replace("komiktap:", "");
+    let manga = null;
+    try { manga = await getKomiktapMangaDetail(komiktapUrl); } catch (e) {}
+    if (!manga) return <ErrorState msg="Data Komiktap Terputus" />;
 
-  const chapters = chaptersData?.data || [];
+    const formattedChapters: ChapterItem[] = (manga.chapters || []).map((c: any) => ({
+      id: c.id, attributes: { chapter: c.chapter, title: c.title, publishAt: c.publishAt, translatedLanguage: "id", nyoraSource: "komiktap", nyoraMangaUrl: manga.url, sourceName: "Komiktap" }
+    }));
+    formattedChapters.sort((a, b) => (parseFloat(b.attributes.chapter || "0") || 0) - (parseFloat(a.attributes.chapter || "0") || 0));
+    
+    return (
+      <>
+        <KomiktapComicInfo manga={manga} />
+        <div id="chapter-list" className="mt-12">
+          <div className="flex items-end justify-between border-b-2 border-gray-900 pb-4 mb-6">
+            <h2 className="text-3xl font-black uppercase tracking-tighter">Indeks Chapter</h2>
+            <span className="font-mono text-sm bg-gray-900 text-white px-3 py-1">TOTAL: {formattedChapters.length}</span>
+          </div>
+          <div className="border border-gray-300 bg-white">
+            <ChapterList chapters={formattedChapters} mangaId={decodedId} languages={{ id: formattedChapters.length }} />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ROUTE MANGADEX
+  let mangaData = null;
+  try { mangaData = await getMangaById(decodedId); } catch (e) {}
+  if (!mangaData?.data) return <ErrorState msg="Data MangaDex Terputus" />;
+
+  const manga = mangaData.data;
+  const titles = getTitleCandidates(manga);
+  const lastChapter = manga.attributes.lastChapter || null;
 
   return (
     <>
-      {/* BAGIAN INFO KOMIK */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 md:p-8 flex flex-col md:flex-row gap-8 mb-8">
-        <div className="w-full md:w-64 flex-shrink-0">
-          <img 
-            src={coverUrl} 
-            alt={title} 
-            className="w-full aspect-[3/4] object-cover rounded-lg shadow-md border border-gray-100"
-          />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2">{title}</h1>
-          
-          <div className="flex flex-wrap gap-2 mb-4">
-            {manga.attributes.tags.slice(0, 5).map((tag: any) => (
-              <span key={tag.id} className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded font-semibold uppercase tracking-wider">
-                {tag.attributes.name.en}
-              </span>
-            ))}
-          </div>
-
-          <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line mb-6 line-clamp-6">
-            {description}
-          </p>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-gray-100 pt-4">
-            <div>
-              <p className="text-xs text-gray-400 font-semibold uppercase">Status</p>
-              <p className="font-bold text-gray-900 capitalize">{manga.attributes.status}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 font-semibold uppercase">Tahun</p>
-              <p className="font-bold text-gray-900">{manga.attributes.year || "-"}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* BAGIAN DAFTAR CHAPTER */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <BookOpen className="w-5 h-5" /> Daftar Chapter
-          </h2>
-        </div>
-        
-        <div className="divide-y divide-gray-100">
-          {chapters.length > 0 ? (
-            chapters.map((chapter: any) => (
-              <div key={chapter.id} className="p-4 hover:bg-gray-50 transition flex justify-between items-center">
-                <div>
-                  <p className="font-semibold text-gray-800">
-                    Chapter {chapter.attributes.chapter || "?"}
-                    {chapter.attributes.title && `: ${chapter.attributes.title}`}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Dirilis: {new Date(chapter.attributes.publishAt).toLocaleDateString("id-ID")}
-                  </p>
-                </div>
-                <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-900 hover:text-white transition">
-                  Baca
-                </button>
-              </div>
-            ))
-          ) : (
-            <div className="p-8 text-center text-gray-500">
-              Belum ada chapter yang tersedia (atau API gagal memuat).
-            </div>
-          )}
-        </div>
-      </div>
+      <ComicInfo manga={manga} />
+      <Suspense fallback={<LoadingState />}>
+        <ComicChapters id={id} titles={titles} lastChapter={lastChapter} />
+      </Suspense>
     </>
   );
 }
 
-// 2. Komponen Halaman Utama (Default Export)
-export default async function ComicDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+function LoadingState() {
+  return <div className="py-20 text-center font-mono text-xs uppercase animate-pulse">Memuat Data...</div>;
+}
 
+function ErrorState({ msg }: { msg: string }) {
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-12">
-      
-      {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center gap-4">
-          <Link href="/" className="flex items-center text-gray-500 hover:text-gray-900 transition font-semibold text-sm">
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Kembali ke Beranda
-          </Link>
-        </div>
-      </header>
+    <div className="text-center py-20 font-mono">
+      <h1 className="text-4xl font-black uppercase mb-4">404 // Not Found</h1>
+      <p className="text-gray-500 mb-8 max-w-md mx-auto">{msg}</p>
+      <Link href="/" className="bg-gray-900 text-white px-8 py-3 uppercase tracking-widest text-sm hover:bg-gray-700 transition">Kembali ke Beranda</Link>
+    </div>
+  );
+}
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* 3. BUNGKUS DENGAN SUSPENSE (Kunci agar build Vercel berhasil) */}
-        <Suspense 
-          fallback={
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mb-4"></div>
-              <p className="text-gray-500 font-medium">Memuat detail komik...</p>
-            </div>
-          }
-        >
-          <ComicDetails id={id} />
+// ==========================================
+// 4. Halaman Utama
+// ==========================================
+export default function ComicDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans selection:bg-amber-500 selection:text-white pb-20">
+      <Header />
+      <main className="max-w-6xl mx-auto px-4 pt-12">
+        <Suspense fallback={<LoadingState />}>
+          <ComicDetailsWrapper params={params} />
         </Suspense>
       </main>
     </div>
