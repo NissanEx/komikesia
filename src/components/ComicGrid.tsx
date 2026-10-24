@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, SlidersHorizontal, Loader2, Database } from "lucide-react";
 
@@ -23,7 +23,6 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
   const [activeSource, setActiveSource] = useState("Semua");
   const [currentPage, setCurrentPage] = useState(1);
   
-  // State untuk data yang sedang ditampilkan
   const [comics, setComics] = useState<ComicItem[]>(initialComics.slice(0, ITEMS_PER_PAGE));
   const [totalItems, setTotalItems] = useState<number>(total || initialComics.length);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,20 +39,20 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
     return "Manga";
   };
 
+  // HAPUS DUPLIKAT
+  const uniqueComics = useMemo(() => {
+    const seen = new Set<string>();
+    return comics.filter((comic) => {
+      if (seen.has(comic.id)) return false;
+      seen.add(comic.id);
+      return true;
+    });
+  }, [comics]);
+
+  // Kalkulasi halaman dinamis (berdasarkan totalItems dari API)
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   useEffect(() => {
-    // KONDISI 1: JIKA KONDISI AWAL (Halaman 1, Filter Default), GUNAKAN DATA DARI SERVER (SSR)
-    if (currentPage === 1 && activeCategory === "Semua" && activeSort === "Populer" && activeSource === "Semua") {
-      if (initialComics.length > 0) {
-        setComics(initialComics.slice(0, ITEMS_PER_PAGE));
-        setTotalItems(total || initialComics.length);
-        setIsLoading(false);
-        return; // Hentikan eksekusi, tidak perlu fetch API
-      }
-    }
-
-    // KONDISI 2: JIKA FILTER BERUBAH, AMBIL DATA DARI API
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -61,16 +60,14 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
           cache: "no-store",
         });
         
-        if (!res.ok) throw new Error("Gagal mengambil data");
+        if (!res.ok) throw new Error("Gagal");
         
         const json = await res.json();
-        const safeData = (json.data || []).slice(0, ITEMS_PER_PAGE);
-
-        setComics(safeData);
-        setTotalItems(json.total || 0);
+        setComics((json.data || []).slice(0, ITEMS_PER_PAGE));
+        setTotalItems(json.total || 0); // Ambil total dari API (Komiktap)
+        
       } catch (error) {
-        console.error("API Error:", error);
-        // Jika gagal, kosongkan grid agar tidak menampilkan data lama yang salah
+        console.error(error);
         setComics([]); 
         setTotalItems(0);
       } finally {
@@ -79,18 +76,17 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
     };
 
     fetchData();
-  }, [currentPage, activeCategory, activeSort, activeSource, initialComics, total]);
+  }, [currentPage, activeCategory, activeSort, activeSource]);
 
   const handleFilterChange = (type: "category" | "sort" | "source", value: string) => {
     if (type === "category") setActiveCategory(value);
     if (type === "sort") setActiveSort(value);
     if (type === "source") setActiveSource(value);
-    setCurrentPage(1); // Selalu reset ke halaman 1 saat filter berubah
+    setCurrentPage(1); 
   };
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
-    // Scroll ke atas Grid komik
     if (topGridRef.current) {
       const yOffset = -100; 
       const y = topGridRef.current.getBoundingClientRect().top + window.scrollY + yOffset;
@@ -100,11 +96,8 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
 
   return (
     <div className="w-full relative" ref={topGridRef}>
-      
       {/* HEADER: KATEGORI, SUMBER, & SORTIR */}
       <div className="flex flex-row items-center justify-between gap-2 mb-8 border-b-2 border-gray-900 pb-4">
-        
-        {/* Tabs Kategori (Mobile Scrollable) */}
         <div className="flex flex-row items-center gap-1 md:gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {categories.map((category) => (
             <button
@@ -122,7 +115,6 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
           ))}
         </div>
 
-        {/* Dropdown Filter (Desktop) */}
         <div className="hidden md:flex items-center gap-2 shrink-0">
           <Database className="w-4 h-4 text-gray-500" />
           <select
@@ -149,9 +141,7 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
           </select>
         </div>
 
-        {/* Ikon Filter (Mobile) */}
         <div className="flex md:hidden items-center gap-2 shrink-0">
-          {/* Tombol Sumber */}
           <div className="relative">
             <select
               value={activeSource}
@@ -168,7 +158,6 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
             </div>
           </div>
 
-          {/* Tombol Sortir */}
           <div className="relative">
             <select
               value={activeSort}
@@ -185,13 +174,10 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
             </div>
           </div>
         </div>
-
       </div>
 
-      {/* AREA GRID KOMIK */}
+      {/* GRID KOMIK */}
       <div className="relative min-h-[500px]">
-        
-        {/* Indikator Loading */}
         {isLoading && (
           <div className="absolute inset-0 z-10 bg-[#f4f4f4]/80 flex flex-col items-center justify-center border-2 border-dashed border-gray-300">
             <Loader2 className="w-10 h-10 animate-spin text-amber-500 mb-4" />
@@ -201,14 +187,11 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
           </div>
         )}
 
-        {/* Render Komik */}
-        {comics.length > 0 ? (
+        {uniqueComics.length > 0 ? (
           <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 transition-opacity duration-300 ${isLoading ? "opacity-30" : "opacity-100"}`}>
-            {comics.map((comic) => (
+            {uniqueComics.map((comic) => (
               <Link href={`/comic/${comic.id}`} key={comic.id} className="group">
                 <div className="bg-white border-2 border-gray-900 flex flex-col h-full transition-all duration-300 group-hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] group-hover:-translate-y-1 group-hover:-translate-x-1">
-                  
-                  {/* Gambar Sampul */}
                   <div className="relative aspect-[3/4] overflow-hidden border-b-2 border-gray-900 bg-gray-100">
                     <img
                       src={`/api/image?url=${encodeURIComponent(comic.img)}`}
@@ -224,8 +207,6 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
                       </div>
                     )}
                   </div>
-
-                  {/* Teks Info */}
                   <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
                     <div>
                       <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight uppercase line-clamp-2 mb-2 group-hover:text-amber-600 transition-colors" title={comic.title}>
@@ -238,13 +219,11 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
                       </div>
                     </div>
                   </div>
-
                 </div>
               </Link>
             ))}
           </div>
         ) : (
-          // Tampilan Jika Kosong
           <div className="w-full py-20 text-center border-2 border-dashed border-gray-300 bg-white">
             <p className="text-gray-500 font-mono text-sm uppercase tracking-widest">
               Tidak ada komik untuk sumber <strong>{activeSource}</strong>.
@@ -253,11 +232,11 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
         )}
       </div>
 
-      {/* PAGINATION BAR */}
-      {!isLoading && comics.length > 0 && (
+      {/* PAGINATION BAR (Render Total Dinamis) */}
+      {!isLoading && uniqueComics.length > 0 && (
         <div className="mt-12 pt-6 border-t-2 border-gray-900 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="font-mono text-sm text-gray-600 font-bold uppercase tracking-widest">
-            Menampilkan {comics.length} dari <strong>{totalItems}</strong> komik 
+            Menampilkan {uniqueComics.length} dari <strong>{totalItems}</strong> komik 
             {activeSource !== "Semua" ? ` (${activeSource})` : ""}
           </p>
 
