@@ -112,7 +112,7 @@ export default function SearchPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   return (
-    <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans pb-20 selection:bg-amber-500 selection:text-white">
+    <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans pb-0 selection:bg-amber-500 selection:text-white">
       <Header />
       <main className="max-w-7xl mx-auto px-4 pt-12">
         <Suspense fallback={

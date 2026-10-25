@@ -17,7 +17,7 @@ async function CatalogContent() {
 
 function CatalogSkeleton() {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse w-full">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
         {[...Array(20)].map((_, i) => (
           <div key={i} className="flex flex-col">
@@ -33,16 +33,17 @@ function CatalogSkeleton() {
 
 export default function CatalogPage() {
   return (
-    <div className="min-h-screen bg-[#f4f4f4] font-sans text-gray-900 pb-12 selection:bg-amber-500 selection:text-white">
+    // REVISI: Menambahkan flex flex-col
+    <div className="min-h-screen flex flex-col bg-[#f4f4f4] font-sans text-gray-900 selection:bg-amber-500 selection:text-white">
       <Header />
       
-      <main className="max-w-7xl mx-auto px-4 py-12">
+      {/* REVISI: Menambahkan flex-grow w-full */}
+      <main className="flex-grow w-full max-w-7xl mx-auto px-4 py-12">
         <div className="mb-8">
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
             Katalog
           </h1>
         </div>
-
         <Suspense fallback={<CatalogSkeleton />}>
           <CatalogContent />
         </Suspense>

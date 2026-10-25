@@ -12,7 +12,7 @@ type ComicItem = {
   rating?: number;
   readers: string;
   chapters: string;
-  source?: "mangadex" | "anilist" | "komiku"; // Komiktap dihapus
+  source?: "mangadex" | "anilist" | "komiku"; 
 };
 
 const ITEMS_PER_PAGE = 20;
@@ -36,8 +36,12 @@ export default function ComicGrid({
   const [isLoading, setIsLoading] = useState(false);
 
   const topGridRef = useRef<HTMLDivElement>(null);
+  
+  // 1. REF UNTUK MENCEGAH DOUBLE FETCH SAAT PERTAMA KALI RENDER
+  const isFirstRender = useRef(true);
+
   const categories = ["Semua", "Manga", "Manhwa", "Manhua"];
-  const sources = ["Semua", "MangaDex", "Komiku", "AniList"]; // Komiktap dihapus
+  const sources = ["Semua", "MangaDex", "Komiku", "AniList"];
   
   const normalizeType = (type: string | undefined | null) => {
     if (!type) return "Manga";
@@ -59,6 +63,12 @@ export default function ComicGrid({
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   useEffect(() => {
+    // 2. JIKA INI RENDER PERTAMA, LEWATI FETCH (Gunakan data dari Server)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
     const fetchData = async () => {
       setIsLoading(true);
       try {

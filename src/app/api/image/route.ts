@@ -38,6 +38,9 @@ export async function GET(request: Request) {
     // 2. FETCH GAMBAR DENGAN HEADER LENGKAP
     // ==========================================
     const res = await fetch(imageUrl, {
+      // TAMBAHKAN BARIS INI: Simpan gambar di cache Next.js selama 1 hari
+      cache: 'force-cache', 
+      next: { revalidate: 86400 }, 
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": referer, 
@@ -47,8 +50,8 @@ export async function GET(request: Request) {
         "Sec-Fetch-Mode": "no-cors",
         "Sec-Fetch-Site": "cross-site"
       },
-      // Tambahkan timeout agar tidak menggantung selamanya jika server lambat
-      signal: AbortSignal.timeout(15000) 
+      // TURUNKAN TIMEOUT: Dari 15 detik jadi 5 detik agar tidak menggantung lama
+      signal: AbortSignal.timeout(5000) 
     });
 
     if (!res.ok) {

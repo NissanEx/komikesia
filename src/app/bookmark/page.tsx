@@ -1,6 +1,5 @@
 "use client";
 
-// TAMBAHKAN BARIS INI: Mencegah Next.js melakukan prerender statis pada halaman ini
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from "react";
@@ -10,7 +9,6 @@ import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
-// Tipe data untuk komik yang disimpan
 type BookmarkedComic = {
   id: string;
   title: string;
@@ -30,7 +28,6 @@ export default function BookmarkPage() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
-          // JIKA LOGIN: Ambil dari Supabase
           const { data, error } = await supabase
             .from("bookmarks")
             .select("*")
@@ -48,7 +45,6 @@ export default function BookmarkPage() {
             setBookmarks(formattedData);
           }
         } else {
-          // JIKA GUEST: Ambil dari localStorage
           const saved = localStorage.getItem("komik_bookmarks");
           if (saved) {
             setBookmarks(JSON.parse(saved));
@@ -69,14 +65,12 @@ export default function BookmarkPage() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
-        // JIKA LOGIN: Hapus dari Supabase
         await supabase
           .from("bookmarks")
           .delete()
           .eq("user_id", session.user.id)
           .eq("comic_id", id);
       } else {
-        // JIKA GUEST: Hapus dari localStorage
         const updated = bookmarks.filter((b) => b.id !== id);
         localStorage.setItem("komik_bookmarks", JSON.stringify(updated));
       }
@@ -89,10 +83,12 @@ export default function BookmarkPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f4f4] font-sans text-gray-900 pb-12 selection:bg-amber-500 selection:text-white">
+    // REVISI: Menambahkan flex flex-col
+    <div className="min-h-screen flex flex-col bg-[#f4f4f4] font-sans text-gray-900 selection:bg-amber-500 selection:text-white">
       <Header />
       
-      <main className="max-w-7xl mx-auto px-4 py-12">
+      {/* REVISI: Menambahkan flex-grow w-full */}
+      <main className="flex-grow w-full max-w-7xl mx-auto px-4 py-12">
         
         <div className="mb-10 border-b-2 border-gray-900 pb-6">
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
@@ -120,7 +116,7 @@ export default function BookmarkPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+          <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {bookmarks.map((comic) => (
               <div key={comic.id} className="group relative">
                 

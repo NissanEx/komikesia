@@ -1,32 +1,38 @@
-import { Suspense } from "react";
-import { connection } from "next/server";
+import { Suspense, cache } from "react";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import ComicGrid from "@/components/ComicGrid";
 import NewsFeed from "@/components/NewsFeed";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
+import FeaturedSlider from "@/components/FeaturedSlider";
 import { getPopularManga } from "@/lib/mangadex"; 
 import { getAnilistPopularManga } from "@/lib/anilist";
 import { getKomikuPopularManga } from "@/lib/komiku";
 
-// TAMBAHKAN BARIS INI: Memaksa halaman menjadi dinamis (Server-Side Rendering)
 export const dynamic = 'force-dynamic';
 
-async function HeroServer() {
-  await connection();
-  
+const getCachedMangaDex = cache(getPopularManga);
+const getCachedAniList = cache(getAnilistPopularManga);
+const getCachedKomiku = cache(getKomikuPopularManga);
+
+const getHomepageData = cache(async () => {
   const results = await Promise.allSettled([
-    getPopularManga(),
-    getAnilistPopularManga(),
-    getKomikuPopularManga(1)
+    getCachedMangaDex(),
+    getCachedAniList(),
+    getCachedKomiku(1)
   ]);
 
-  const mdxData = results[0].status === "fulfilled" ? results[0].value.data : [];
-  const aniData = results[1].status === "fulfilled" ? results[1].value : [];
-  const komikuData = results[2].status === "fulfilled" ? results[2].value.data : [];
+  return {
+    mdxRes: results[0].status === "fulfilled" ? results[0].value : { data: [], total: 0 },
+    aniRes: results[1].status === "fulfilled" ? results[1].value : [],
+    komikuRes: results[2].status === "fulfilled" ? results[2].value : { data: [], total: 0 }
+  };
+});
 
-  const combined = [...mdxData, ...aniData, ...komikuData];
+async function HeroServer() {
+  const { mdxRes, aniRes, komikuRes } = await getHomepageData();
+  const combined = [...mdxRes.data, ...aniRes, ...komikuRes.data];
   
   const heroSamples = combined.slice(0, 10).map((c: any) => ({
     id: c.id,
@@ -41,17 +47,7 @@ async function HeroServer() {
 }
 
 async function PopularComics() {
-  await connection();
-  
-  const results = await Promise.allSettled([
-    getPopularManga(),
-    getAnilistPopularManga(),
-    getKomikuPopularManga(1)
-  ]);
-
-  const mdxRes = results[0].status === "fulfilled" ? results[0].value : { data: [], total: 0 };
-  const aniRes = results[1].status === "fulfilled" ? results[1].value : [];
-  const komikuRes = results[2].status === "fulfilled" ? results[2].value : { data: [], total: 0 };
+  const { mdxRes, aniRes, komikuRes } = await getHomepageData();
 
   const combined = [];
   const mdxData = mdxRes.data;
@@ -78,6 +74,20 @@ async function PopularComics() {
   return <ComicGrid initialComics={combined} total={totalCombined} />;
 }
 
+async function FeaturedServer() {
+  const { mdxRes, aniRes, komikuRes } = await getHomepageData();
+  const combined = [...mdxRes.data, ...aniRes, ...komikuRes.data];
+  
+  // PERBAIKAN: Menghapus Math.random() untuk mencegah Hydration Error.
+  // Kita gunakan irisan tetap, atau bisa gunakan fungsi shuffle berbasis ID jika ingin benar-benar acak.
+  const sliced = combined.slice(5, 15);
+  
+  return <FeaturedSlider comics={sliced} />;
+}
+
+// ==========================================
+// SKELETON (Tampilan saat Loading)
+// ==========================================
 function HeroSkeleton() {
   return (
     <div className="w-full h-[500px] md:h-[600px] bg-[#111] animate-pulse flex items-center border-b border-gray-300">
@@ -132,16 +142,39 @@ function SidebarSkeleton() {
   );
 }
 
+function SliderSkeleton() {
+  return (
+    <div className="py-16 bg-[#f4f4f4] w-full overflow-hidden relative">
+      <div className="max-w-7xl mx-auto px-4 mb-10">
+        <div className="w-48 h-8 bg-gray-300 animate-pulse mb-3"></div>
+      </div>
+      
+      <div className="w-full flex justify-center gap-2">
+        <div className="w-[120px] md:w-[160px] aspect-[3/4] bg-gray-200 animate-pulse border-2 border-gray-300 transform scale-90 opacity-60"></div>
+        <div className="w-[120px] md:w-[160px] aspect-[3/4] bg-gray-300 animate-pulse border-2 border-gray-400 z-10 shadow-lg"></div>
+        <div className="w-[120px] md:w-[160px] aspect-[3/4] bg-gray-200 animate-pulse border-2 border-gray-300 transform scale-90 opacity-60"></div>
+        <div className="w-[120px] md:w-[160px] aspect-[3/4] bg-gray-200 animate-pulse border-2 border-gray-300 transform scale-90 opacity-60 hidden md:block"></div>
+        <div className="w-[120px] md:w-[160px] aspect-[3/4] bg-gray-200 animate-pulse border-2 border-gray-300 transform scale-90 opacity-60 hidden md:block"></div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// MAIN PAGE
+// ==========================================
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#f4f4f4] font-sans text-gray-900 pb-12 selection:bg-amber-500 selection:text-white">
+    // PERBAIKAN: Menggunakan flex flex-col min-h-screen
+    <div className="min-h-screen flex flex-col bg-[#f4f4f4] font-sans text-gray-900 selection:bg-amber-500 selection:text-white">
       <Header />
 
       <Suspense fallback={<HeroSkeleton />}>
         <HeroServer />
       </Suspense>
 
-      <main className="max-w-7xl mx-auto px-4 py-10 flex flex-col lg:grid lg:grid-cols-12 gap-10">
+      {/* PERBAIKAN: Menambahkan flex-grow agar mendorong footer ke paling bawah */}
+      <main className="flex-grow w-full max-w-7xl mx-auto px-4 py-10 flex flex-col lg:grid lg:grid-cols-12 gap-10">
         <div className="w-full lg:col-span-8 flex flex-col gap-12">
           <Suspense fallback={<ComicSkeleton />}>
             <PopularComics />
@@ -158,6 +191,11 @@ export default function Home() {
           </Suspense>
         </div>
       </main>
+
+      {/* Slider Rekomendasi (Di Atas Footer) */}
+      <Suspense fallback={<SliderSkeleton />}>
+        <FeaturedServer />
+      </Suspense>
 
       <Footer />
     </div>

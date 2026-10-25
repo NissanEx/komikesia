@@ -113,36 +113,26 @@ function parseKomikuPage(html: string): any[] {
 }
 export async function getKomikuPopularManga(page: number = 1, limit: number = 20, category: string = "Semua"): Promise<{ data: any[], total: number }> {
   try {
-    let allComics: any[] = [];
-    let currentApiPage = (page - 1) * 2 + 1;
-    let attempts = 0;
-    const maxAttempts = 8;
+    const apiPage1 = (page - 1) * 2 + 1;
+    const apiPage2 = apiPage1 + 1;
 
-    while (allComics.length < limit && attempts < maxAttempts) {
-      const [html1, html2] = await Promise.all([
-        fetchHtml(`${KOMIKU_API}/manga/page/${currentApiPage}/`),
-        fetchHtml(`${KOMIKU_API}/manga/page/${currentApiPage + 1}/`)
-      ]);
+    // Hanya fetch 2 halaman secara paralel (jauh lebih cepat)
+    const [html1, html2] = await Promise.all([
+      fetchHtml(`${KOMIKU_API}/manga/page/${apiPage1}/`),
+      fetchHtml(`${KOMIKU_API}/manga/page/${apiPage2}/`)
+    ]);
 
-      const comics1 = html1 ? parseKomikuPage(html1) : [];
-      const comics2 = html2 ? parseKomikuPage(html2) : [];
-      
-      let combined = [...comics1, ...comics2];
+    const comics1 = html1 ? parseKomikuPage(html1) : [];
+    const comics2 = html2 ? parseKomikuPage(html2) : [];
+    
+    let combined = [...comics1, ...comics2];
 
-      if (category !== "Semua") {
-        combined = combined.filter((c) => c.type.toLowerCase() === category.toLowerCase());
-      }
-
-      allComics = [...allComics, ...combined];
-
-      if (comics1.length === 0 && comics2.length === 0) break;
-
-      currentApiPage += 2;
-      attempts++;
+    if (category !== "Semua") {
+      combined = combined.filter((c) => c.type.toLowerCase() === category.toLowerCase());
     }
 
     const seen = new Set<string>();
-    const uniqueComics = allComics.filter((c) => {
+    const uniqueComics = combined.filter((c) => {
       if (seen.has(c.id)) return false;
       seen.add(c.id);
       return true;
