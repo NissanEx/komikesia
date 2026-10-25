@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import Link from "next/link"; // Tambahkan import Link
 import { ArrowUp } from "lucide-react";
 
 const WORDS = [
@@ -142,7 +143,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* PERBAIKAN: Mengubah max-w-[1100px] menjadi max-w-7xl agar sejajar dengan konten di atasnya */}
         <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-12 md:grid-cols-12">
             <div className="md:col-span-10 lg:col-span-8">
@@ -170,12 +170,30 @@ export default function Footer() {
 
           {/* ====== BOTTOM BAR ====== */}
           <div className="relative mt-20 border-t border-[#eeede8]/15 py-6">
-            <div className="flex flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               
-              <p className="text-[10px] sm:text-[12px] uppercase tracking-wide text-[#eeede8]/60 whitespace-nowrap">
-                © {new Date().getFullYear()} Comic Network
-              </p>
+              {/* KIRI: Copyright & Legal Links */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-4 text-[10px] sm:text-[12px] uppercase tracking-wide text-[#eeede8]/60">
+                <p className="whitespace-nowrap">
+                  © {new Date().getFullYear()} Comic Network
+                </p>
+                <span className="hidden sm:inline text-[#eeede8]/30">•</span>
+                <Link 
+                  href="/privacy" 
+                  className="hover:text-[#eeede8] hover:underline transition-colors whitespace-nowrap"
+                >
+                  Privacy
+                </Link>
+                <span className="hidden sm:inline text-[#eeede8]/30">•</span>
+                <Link 
+                  href="/terms" 
+                  className="hover:text-[#eeede8] hover:underline transition-colors whitespace-nowrap"
+                >
+                  Terms
+                </Link>
+              </div>
 
+              {/* KANAN: Built by & Tombol Panah */}
               <div className="flex flex-row items-center gap-3 sm:gap-6">
                 <p className="text-[10px] sm:text-[12px] uppercase tracking-wide text-[#eeede8]/60 whitespace-nowrap">
                   Built by{" "}
