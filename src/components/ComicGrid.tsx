@@ -12,12 +12,20 @@ type ComicItem = {
   rating?: number;
   readers: string;
   chapters: string;
-  source?: "mangadex" | "komiktap" | "anilist"; 
+  source?: "mangadex" | "anilist" | "komiku"; // Komiktap dihapus
 };
 
 const ITEMS_PER_PAGE = 20;
 
-export default function ComicGrid({ initialComics, total }: { initialComics: ComicItem[], total?: number }) {
+export default function ComicGrid({ 
+  initialComics, 
+  total, 
+  initialQuery = "" 
+}: { 
+  initialComics: ComicItem[]; 
+  total?: number; 
+  initialQuery?: string;
+}) {
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [activeSort, setActiveSort] = useState("Populer");
   const [activeSource, setActiveSource] = useState("Semua");
@@ -29,8 +37,8 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
 
   const topGridRef = useRef<HTMLDivElement>(null);
   const categories = ["Semua", "Manga", "Manhwa", "Manhua"];
-  const sources = ["Semua", "MangaDex", "Komiktap", "AniList"];
-
+  const sources = ["Semua", "MangaDex", "Komiku", "AniList"]; // Komiktap dihapus
+  
   const normalizeType = (type: string | undefined | null) => {
     if (!type) return "Manga";
     const t = type.toLowerCase().trim();
@@ -39,7 +47,6 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
     return "Manga";
   };
 
-  // HAPUS DUPLIKAT
   const uniqueComics = useMemo(() => {
     const seen = new Set<string>();
     return comics.filter((comic) => {
@@ -49,22 +56,24 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
     });
   }, [comics]);
 
-  // Kalkulasi halaman dinamis (berdasarkan totalItems dari API)
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/comics?page=${currentPage}&limit=${ITEMS_PER_PAGE}&category=${activeCategory}&sort=${activeSort}&source=${activeSource}&t=${Date.now()}`, {
-          cache: "no-store",
-        });
+        let url = `/api/comics?page=${currentPage}&limit=${ITEMS_PER_PAGE}&category=${activeCategory}&sort=${activeSort}&source=${activeSource}&t=${Date.now()}`;
+        if (initialQuery) {
+          url += `&q=${encodeURIComponent(initialQuery)}`;
+        }
+
+        const res = await fetch(url, { cache: "no-store" });
         
         if (!res.ok) throw new Error("Gagal");
         
         const json = await res.json();
         setComics((json.data || []).slice(0, ITEMS_PER_PAGE));
-        setTotalItems(json.total || 0); // Ambil total dari API (Komiktap)
+        setTotalItems(json.total || 0); 
         
       } catch (error) {
         console.error(error);
@@ -76,7 +85,7 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
     };
 
     fetchData();
-  }, [currentPage, activeCategory, activeSort, activeSource]);
+  }, [currentPage, activeCategory, activeSort, activeSource, initialQuery]);
 
   const handleFilterChange = (type: "category" | "sort" | "source", value: string) => {
     if (type === "category") setActiveCategory(value);
@@ -189,39 +198,53 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
 
         {uniqueComics.length > 0 ? (
           <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 transition-opacity duration-300 ${isLoading ? "opacity-30" : "opacity-100"}`}>
-            {uniqueComics.map((comic) => (
-              <Link href={`/comic/${comic.id}`} key={comic.id} className="group">
-                <div className="bg-white border-2 border-gray-900 flex flex-col h-full transition-all duration-300 group-hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] group-hover:-translate-y-1 group-hover:-translate-x-1">
-                  <div className="relative aspect-[3/4] overflow-hidden border-b-2 border-gray-900 bg-gray-100">
-                    <img
-                      src={`/api/image?url=${encodeURIComponent(comic.img)}`}
-                      alt={comic.title}
-                      className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute top-0 right-0 bg-gray-900 text-white font-mono text-[10px] font-bold px-2 py-1 uppercase tracking-widest">
-                      {normalizeType(comic.type)}
-                    </div>
-                    {comic.source && comic.source !== "mangadex" && (
-                      <div className={`absolute top-0 left-0 text-white font-mono text-[10px] font-bold px-2 py-1 uppercase tracking-widest ${comic.source === "komiktap" ? "bg-amber-500" : "bg-blue-600"}`}>
-                        {comic.source}
+            {uniqueComics.map((comic) => {
+              const isChapterSource = ["komiku", "anilist"].includes(comic.source || "");
+              const label = isChapterSource ? "Ch." : "Vol.";
+              
+              let chapterValue = comic.chapters ? comic.chapters.toString().trim() : "-";
+              if (chapterValue === "?" || chapterValue === "" || chapterValue === "null") {
+                chapterValue = "-";
+              }
+
+              return (
+                <Link href={`/comic/${comic.id}`} key={comic.id} className="group">
+                  <div className="bg-white border-2 border-gray-900 flex flex-col h-full transition-all duration-300 group-hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] group-hover:-translate-y-1 group-hover:-translate-x-1">
+                    <div className="relative aspect-[3/4] overflow-hidden border-b-2 border-gray-900 bg-gray-100">
+                      <img
+                        src={`/api/image?url=${encodeURIComponent(comic.img)}`}
+                        alt={comic.title}
+                        className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute top-0 right-0 bg-gray-900 text-white font-mono text-[10px] font-bold px-2 py-1 uppercase tracking-widest">
+                        {normalizeType(comic.type)}
                       </div>
-                    )}
-                  </div>
-                  <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight uppercase line-clamp-2 mb-2 group-hover:text-amber-600 transition-colors" title={comic.title}>
-                        {comic.title}
-                      </h3>
-                      <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono uppercase tracking-widest">
-                        <span>{comic.source === "komiktap" ? "Ch." : "Vol."} {comic.chapters !== "?" ? comic.chapters : "01"}</span>
-                        <span className="w-1 h-1 bg-gray-400 rounded-none"></span>
-                        <span>{comic.readers} Follower</span>
+                      {comic.source && comic.source !== "mangadex" && (
+                        <div className={`absolute top-0 left-0 text-white font-mono text-[10px] font-bold px-2 py-1 uppercase tracking-widest ${
+                          comic.source === "komiku" ? "bg-green-600" : "bg-blue-600"
+                        }`}>
+                          {comic.source}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="font-black text-sm md:text-base text-gray-900 leading-tight uppercase line-clamp-2 mb-2 group-hover:text-amber-600 transition-colors" title={comic.title}>
+                          {comic.title}
+                        </h3>
+                        <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono uppercase tracking-widest">
+                          <span className="whitespace-nowrap">
+                            {label} {chapterValue}
+                          </span>
+                          <span className="w-1 h-1 bg-gray-400 rounded-none"></span>
+                          <span className="truncate">{comic.readers}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <div className="w-full py-20 text-center border-2 border-dashed border-gray-300 bg-white">
@@ -232,7 +255,7 @@ export default function ComicGrid({ initialComics, total }: { initialComics: Com
         )}
       </div>
 
-      {/* PAGINATION BAR (Render Total Dinamis) */}
+      {/* PAGINATION BAR */}
       {!isLoading && uniqueComics.length > 0 && (
         <div className="mt-12 pt-6 border-t-2 border-gray-900 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="font-mono text-sm text-gray-600 font-bold uppercase tracking-widest">

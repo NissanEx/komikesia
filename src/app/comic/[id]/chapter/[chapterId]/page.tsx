@@ -2,10 +2,28 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowLeft, ExternalLink, Loader2, AlertTriangle } from "lucide-react";
 import { getChapterImages, getMangaChapters } from "@/lib/mangadex";
-import { getNyoraChapterPages } from "@/lib/nyora";
 import { getComickChapterPages } from "@/lib/comick";
-import { getKomiktapChapterPages } from "@/lib/komiktap"; // Import Komiktap
+import { getKomikuChapterPages } from "@/lib/komiku";
 import ContinuousReader from "@/components/ContinuousReader";
+
+// FUNGSI SAKTI UNTUK MEMBONGKAR BASE64 / URL ENCODE BERLAPIS
+function decodeUrlSafe(str: string): string {
+  let decoded = str;
+  try { decoded = decodeURIComponent(decoded); } catch(e) {}
+  
+  while (/^[A-Za-z0-9+/=]+$/.test(decoded)) {
+    try {
+      const next = atob(decoded);
+      if (!next) break;
+      decoded = next;
+    } catch(e) {
+      break;
+    }
+  }
+  
+  try { decoded = decodeURIComponent(decoded); } catch(e) {}
+  return decoded;
+}
 
 async function ReaderContent({ 
   params, 
@@ -18,27 +36,17 @@ async function ReaderContent({
   const { source } = await searchParams;
 
   // ==========================================
-  // LOGIKA SUMBER ALTERNATIF (Komiktap/Comick/Nyora)
+  // LOGIKA SUMBER ALTERNATIF
   // ==========================================
   if (source) {
     let images: string[] = [];
-    let finalChapterUrl = chapterId;
+    
+    let finalChapterUrl = decodeUrlSafe(chapterId);
 
-    // 1. DECODE BASE64: Ubah kembali kode acak dari ChapterList menjadi URL asli
     try {
-      const decodedBase64 = decodeURIComponent(chapterId);
-      finalChapterUrl = atob(decodedBase64);
-    } catch (e) {
-      // Jika gagal decode (mungkin bukan base64), coba decode URI biasa
-      finalChapterUrl = decodeURIComponent(chapterId);
-    }
-
-    // 2. Ambil Gambar berdasarkan sumber
-    try {
-      if (source === "Nyora") {
-        images = await getNyoraChapterPages(source, finalChapterUrl);
-      } else if (source === "komiktap") {
-        images = await getKomiktapChapterPages(finalChapterUrl);
+      // Hanya menyisakan Komiku dan Comick
+      if (source === "komiku") { 
+        images = await getKomikuChapterPages(finalChapterUrl);
       } else {
         images = await getComickChapterPages(finalChapterUrl, source);
       }
@@ -46,12 +54,10 @@ async function ReaderContent({
       console.log(`[READER] Gagal ambil gambar dari ${source}:`, err);
     }
 
-    // Jika gambar kosong, tampilkan error state
     if (!images || images.length === 0) {
       return <ErrorState id={id} message={`Gagal memuat gambar dari ${source}. Server sumber sedang membatasi akses atau scrapper-nya error.`} />;
     }
 
-    // Render Gambar (Statis, tanpa infinite scroll)
     return (
       <main className="max-w-3xl mx-auto px-0 md:px-4 py-0 md:py-8 flex flex-col items-center">
         {images.map((imgUrl: string, index: number) => (
@@ -64,7 +70,6 @@ async function ReaderContent({
           />
         ))}
         
-        {/* Tombol Akhir Chapter */}
         <div className="w-full py-16 flex flex-col items-center justify-center border-t-2 border-gray-900 mt-8 bg-white font-mono text-center">
           <h2 className="font-black text-gray-900 text-2xl uppercase tracking-tighter mb-2">
             Akhir Chapter
@@ -84,7 +89,7 @@ async function ReaderContent({
   }
 
   // ==========================================
-  // LOGIKA UTAMA (MangaDex + Infinite Scroll)
+  // LOGIKA UTAMA (MangaDex)
   // ==========================================
   const result = await getChapterImages(chapterId);
   
@@ -135,7 +140,6 @@ async function ReaderContent({
     nextChapterId
   };
 
-  // Panggil ContinuousReader (Infinite Scroll)
   return <ContinuousReader initialData={initialData} mangaId={id} />;
 }
 
@@ -143,8 +147,8 @@ async function ReaderContent({
 // Komponen Error
 // ==========================================
 function ErrorState({ id, message }: { id: string, message: string }) {
-  // Pastikan URL kembali ke halaman detail di-decode
-  const decodedId = decodeURIComponent(id);
+  let decodedId = id;
+  try { decodedId = decodeURIComponent(id); } catch(e) {}
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center font-mono bg-[#f4f4f4]">

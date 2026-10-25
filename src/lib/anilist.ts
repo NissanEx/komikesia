@@ -15,6 +15,7 @@ export type AnilistManga = {
   averageScore: number;
   popularity: number;
   startDate: { year: number; month: number; day: number };
+  countryOfOrigin: string;
   staff: { nodes: { name: { full: string } }[] };
 };
 
@@ -46,9 +47,6 @@ async function fetchAnilist(query: string, variables: Record<string, any>) {
   }
 }
 
-// ==========================================
-// 1. Pencarian Umum
-// ==========================================
 export async function getAnilistMangaBySearch(query: string): Promise<AnilistManga[]> {
   if (!query || query.trim() === "") return [];
 
@@ -68,6 +66,7 @@ export async function getAnilistMangaBySearch(query: string): Promise<AnilistMan
           averageScore
           popularity
           startDate { year month day }
+          countryOfOrigin
           staff(perPage: 2) { nodes { name { full } } }
         }
       }
@@ -90,13 +89,11 @@ export async function getAnilistMangaBySearch(query: string): Promise<AnilistMan
     averageScore: item.averageScore ? item.averageScore / 10 : 0,
     popularity: item.popularity || 0,
     startDate: item.startDate || { year: null, month: null, day: null },
+    countryOfOrigin: item.countryOfOrigin || "JP",
     staff: item.staff || { nodes: [] },
   }));
 }
 
-// ==========================================
-// 2. Detail Berdasarkan ID
-// ==========================================
 export async function getAnilistMangaById(id: number): Promise<AnilistManga | null> {
   const gqlQuery = `
     query ($id: Int) {
@@ -113,6 +110,7 @@ export async function getAnilistMangaById(id: number): Promise<AnilistManga | nu
         averageScore
         popularity
         startDate { year month day }
+        countryOfOrigin
         staff(perPage: 5) { nodes { name { full } } }
       }
     }
@@ -135,15 +133,12 @@ export async function getAnilistMangaById(id: number): Promise<AnilistManga | nu
     averageScore: item.averageScore ? item.averageScore / 10 : 0,
     popularity: item.popularity || 0,
     startDate: item.startDate || { year: null, month: null, day: null },
+    countryOfOrigin: item.countryOfOrigin || "JP",
     staff: item.staff || { nodes: [] },
   };
 }
 
-// ==========================================
-// 3. Populer (Manga, Manhwa, Manhua TERPISAH)
-// ==========================================
 export async function getAnilistPopularManga(): Promise<any[]> {
-  // Fungsi internal untuk mengambil data berdasarkan negara
   const fetchByCountry = async (countryCode: string | null) => {
     const gqlQuery = `
       query ($country: CountryCode) {
@@ -159,6 +154,7 @@ export async function getAnilistPopularManga(): Promise<any[]> {
             coverImage { large }
             chapters
             averageScore
+            popularity
           }
         }
       }
@@ -167,7 +163,6 @@ export async function getAnilistPopularManga(): Promise<any[]> {
     return data?.Page?.media || [];
   };
 
-  // Panggil 4 request secara paralel (Jepang, Korea, China, Taiwan)
   const [jpMedia, krMedia, cnMedia, twMedia] = await Promise.all([
     fetchByCountry("JP"),
     fetchByCountry("KR"),
@@ -175,19 +170,18 @@ export async function getAnilistPopularManga(): Promise<any[]> {
     fetchByCountry("TW"),
   ]);
 
-  // Helper untuk merapikan format
   const mapMedia = (item: any, type: string) => ({
     id: `anilist:${item.id}`,
     title: item.title.english || item.title.romaji || item.title.native,
     type: type,
     img: item.coverImage?.large || "https://via.placeholder.com/400x600?text=No+Image",
-    rating: item.averageScore ? Math.round(item.averageScore / 10) : 0,
-    readers: "AniList",
+    averageScore: item.averageScore ? Math.round(item.averageScore / 10) : 0,
+    popularity: item.popularity || 0,
+    readers: item.popularity ? item.popularity.toLocaleString() : "AniList",
     chapters: item.chapters ? String(item.chapters) : "?",
     source: "anilist" as const,
   });
 
-  // Gabungkan semuanya (Manga, Manhwa, Manhua)
   return [
     ...jpMedia.map((m: any) => mapMedia(m, "Manga")),
     ...krMedia.map((m: any) => mapMedia(m, "Manhwa")),

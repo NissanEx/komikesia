@@ -8,6 +8,7 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import { getPopularManga } from "@/lib/mangadex"; 
 import { getAnilistPopularManga } from "@/lib/anilist";
+import { getKomikuPopularManga } from "@/lib/komiku";
 
 async function HeroServer() {
   await connection();
@@ -19,16 +20,41 @@ async function HeroServer() {
 async function PopularComics() {
   await connection();
   
-  // Ambil data dari MangaDex dan AniList (TANPA Komiktap agar cepat & aman)
-  const [mangadexRes, anilistRes] = await Promise.all([
+  // Hanya memanggil 3 sumber
+  const results = await Promise.allSettled([
     getPopularManga(),
-    getAnilistPopularManga()
+    getAnilistPopularManga(),
+    getKomikuPopularManga(1)
   ]);
 
-  // Gabungkan
-  const combined = [...mangadexRes.data, ...anilistRes];
+  const mdxRes = results[0].status === "fulfilled" ? results[0].value : { data: [], total: 0 };
+  const aniRes = results[1].status === "fulfilled" ? results[1].value : [];
+  const komikuRes = results[2].status === "fulfilled" ? results[2].value : { data: [], total: 0 };
 
-  return <ComicGrid initialComics={combined} total={mangadexRes.total + anilistRes.length} />;
+  const combined = [];
+  const mdxData = mdxRes.data;
+  const aniData = aniRes;
+  const komikuData = komikuRes.data;
+
+  let mdxIdx = 0, aniIdx = 0, komikuIdx = 0;
+  let count = 0;
+  const limit = 20;
+
+  // Looping Interleaving (MangaDex -> Komiku -> AniList)
+  while (count < limit) {
+    let added = false;
+    if (mdxIdx < mdxData.length) { combined.push(mdxData[mdxIdx++]); count++; added = true; }
+    if (count >= limit) break;
+    if (komikuIdx < komikuData.length) { combined.push(komikuData[komikuIdx++]); count++; added = true; }
+    if (count >= limit) break;
+    if (aniIdx < aniData.length) { combined.push(aniData[aniIdx++]); count++; added = true; }
+    if (count >= limit) break;
+    if (!added) break;
+  }
+
+  const totalCombined = mdxRes.total + aniRes.length + komikuRes.total;
+
+  return <ComicGrid initialComics={combined} total={totalCombined} />;
 }
 
 function HeroSkeleton() {
@@ -89,24 +115,29 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f4f4f4] font-sans text-gray-900 pb-12 selection:bg-amber-500 selection:text-white">
       <Header />
+
       <Suspense fallback={<HeroSkeleton />}>
         <HeroServer />
       </Suspense>
+
       <main className="max-w-7xl mx-auto px-4 py-10 flex flex-col lg:grid lg:grid-cols-12 gap-10">
         <div className="w-full lg:col-span-8 flex flex-col gap-12">
           <Suspense fallback={<ComicSkeleton />}>
             <PopularComics />
           </Suspense>
+
           <Suspense fallback={<NewsFeedSkeleton />}>
             <NewsFeed />
           </Suspense>
         </div>
+
         <div className="w-full lg:col-span-4">
           <Suspense fallback={<SidebarSkeleton />}>
             <Sidebar />
           </Suspense>
         </div>
       </main>
+
       <Footer />
     </div>
   );

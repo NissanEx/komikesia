@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search as SearchIcon } from "lucide-react";
+import { Search as SearchIcon } from "lucide-react";
 import { getMangaBySearch } from "@/lib/mangadex";
+import { searchKomiku } from "@/lib/komiku";
+import { getAnilistMangaBySearch } from "@/lib/anilist";
 import ComicGrid from "@/components/ComicGrid";
+import Header from "@/components/Header";
 
-// ==========================================
-// 1. Komponen Header Dinamis (Membaca Search Query)
-// ==========================================
 async function SearchHeader({ searchParamsPromise }: { searchParamsPromise: Promise<{ q?: string }> }) {
   const { q } = await searchParamsPromise;
   const query = q?.trim() || "";
@@ -17,7 +17,6 @@ async function SearchHeader({ searchParamsPromise }: { searchParamsPromise: Prom
         <p className="font-mono text-sm text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
           <SearchIcon className="w-4 h-4" /> Hasil Pencarian
         </p>
-        {/* Jika ada query, tampilkan query. Jika kosong, tampilkan "PENCARIAN" */}
         <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none break-words">
           {query ? `"${query}"` : "PENCARIAN"}
         </h1>
@@ -26,9 +25,6 @@ async function SearchHeader({ searchParamsPromise }: { searchParamsPromise: Prom
   );
 }
 
-// ==========================================
-// 2. Komponen Hasil Pencarian
-// ==========================================
 async function SearchResults({ searchParamsPromise }: { searchParamsPromise: Promise<{ q?: string }> }) {
   const { q } = await searchParamsPromise;
   const query = q?.trim() || "";
@@ -43,16 +39,59 @@ async function SearchResults({ searchParamsPromise }: { searchParamsPromise: Pro
     );
   }
 
-  const comics = await getMangaBySearch(query);
+  // Panggil semua sumber secara paralel
+  const searchResults = await Promise.allSettled([
+    getMangaBySearch(query),
+    searchKomiku(query),
+    getAnilistMangaBySearch(query)
+  ]);
 
-  if (!comics || comics.length === 0) {
+  let combined: any[] = [];
+
+  // 1. MangaDex
+  const mdxData = (searchResults[0].status === "fulfilled" ? searchResults[0].value : []).map((c: any) => ({ ...c, source: "mangadex" }));
+  combined.push(...mdxData);
+
+  // 2. Komiku
+  const komikuData = (searchResults[1].status === "fulfilled" ? searchResults[1].value : []).map((c: any) => ({ ...c, source: "komiku" }));
+  combined.push(...komikuData);
+
+  // 3. AniList
+  const aniRaw = searchResults[2].status === "fulfilled" ? searchResults[2].value : [];
+  const aniData = aniRaw.map((c: any) => {
+    let type = "Manga";
+    if (c.countryOfOrigin === "KR") type = "Manhwa";
+    else if (c.countryOfOrigin === "CN" || c.countryOfOrigin === "TW") type = "Manhua";
+    
+    return {
+      id: `anilist:${c.id}`,
+      title: c.title,
+      type: type,
+      img: c.coverImage,
+      rating: c.averageScore || 0,
+      readers: "AniList",
+      chapters: c.chapters ? String(c.chapters) : "?",
+      source: "anilist"
+    };
+  });
+  combined.push(...aniData);
+
+  // Hapus duplikat
+  const seen = new Set();
+  combined = combined.filter((c) => {
+    if (seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
+
+  if (combined.length === 0) {
     return (
       <div className="text-center py-24 border-2 border-gray-900 bg-white shadow-[8px_8px_0px_rgba(0,0,0,1)]">
         <h2 className="text-4xl font-black uppercase tracking-tighter mb-4 text-gray-900">
           404 // Tidak Ditemukan
         </h2>
         <p className="font-mono text-sm text-gray-600 mb-8 max-w-md mx-auto">
-          Sistem tidak menemukan komik yang cocok dengan kata kunci <strong className="text-gray-900">"{query}"</strong>. Coba gunakan ejaan atau judul alternatif.
+          Sistem tidak menemukan komik yang cocok dengan kata kunci <strong className="text-gray-900">"{query}"</strong> di semua sumber. Coba gunakan ejaan atau judul alternatif.
         </p>
         <Link
           href="/"
@@ -64,12 +103,9 @@ async function SearchResults({ searchParamsPromise }: { searchParamsPromise: Pro
     );
   }
 
-  return <ComicGrid initialComics={comics} />;
+  return <ComicGrid initialComics={combined} initialQuery={query} />;
 }
 
-// ==========================================
-// 3. Halaman Utama (Sinkron)
-// ==========================================
 export default function SearchPage({
   searchParams,
 }: {
@@ -77,20 +113,8 @@ export default function SearchPage({
 }) {
   return (
     <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans pb-20 selection:bg-amber-500 selection:text-white">
-      
-      <header className="border-b border-gray-300 bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between font-mono text-xs uppercase tracking-widest">
-          <Link href="/" className="flex items-center gap-2 hover:text-amber-600 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            Kembali
-          </Link>
-          <span className="text-gray-400">Komik Setya / Pencarian</span>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-12">
-        
-        {/* Bungkus Header dengan Suspense agar judul bisa berubah sesuai query */}
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 pt-12">
         <Suspense fallback={
           <div className="mb-10 border-b-2 border-gray-900 pb-6">
             <div className="w-32 h-4 bg-gray-200 animate-pulse mb-4 rounded-none"></div>
@@ -100,7 +124,6 @@ export default function SearchPage({
           <SearchHeader searchParamsPromise={searchParams} />
         </Suspense>
 
-        {/* Bungkus Hasil dengan Suspense */}
         <Suspense 
           fallback={
             <div className="animate-pulse">
@@ -114,7 +137,6 @@ export default function SearchPage({
         >
           <SearchResults searchParamsPromise={searchParams} />
         </Suspense>
-
       </main>
     </div>
   );
