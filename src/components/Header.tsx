@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase"; // Import Supabase
+import { supabase } from "@/lib/supabase";
 import { Search, LogIn, Home, LayoutGrid, Bookmark, User, LogOut } from "lucide-react";
 
 export default function Header() {
@@ -53,12 +53,13 @@ export default function Header() {
     <header className="bg-white border-b-2 border-gray-900 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-2 md:px-4 h-16 md:h-20 flex flex-row items-center justify-between gap-2 md:gap-6">
         
-        {/* 1. Logo CN */}
+        {/* 1. Logo KN */}
         <Link 
           href="/" 
           className="bg-gray-900 text-white w-9 h-9 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center border-2 border-gray-900 shadow-[2px_2px_0px_rgba(0,0,0,0.2)] md:shadow-[3px_3px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-[2px] transition-all"
         >
-          <span className="text-sm md:text-xl font-black tracking-tighter">CN</span>
+          {/* PERUBAHAN: Teks CN diganti menjadi KN */}
+          <span className="text-sm md:text-xl font-black tracking-tighter">KN</span>
         </Link>
 
         {/* 2. Navigasi Teks (Hanya Desktop) */}
