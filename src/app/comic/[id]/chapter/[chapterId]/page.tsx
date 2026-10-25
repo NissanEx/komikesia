@@ -4,8 +4,9 @@ import { Suspense } from "react";
 import { ArrowLeft, ExternalLink, Loader2, AlertTriangle } from "lucide-react";
 import { getChapterImages, getMangaChapters } from "@/lib/mangadex";
 import { getComickChapterPages } from "@/lib/comick";
-import { getKomikuChapterPages } from "@/lib/komiku";
+import { getKomikuChapterPages, getKomikuMangaDetail } from "@/lib/komiku";
 import ContinuousReader from "@/components/ContinuousReader";
+import AutoNext from "@/components/AutoNext";
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string; chapterId: string }> }
@@ -16,11 +17,11 @@ export async function generateMetadata(
   return {
     title: `Baca Chapter - ${comicTitle}`,
     description: `Baca chapter terbaru dari ${comicTitle} dengan kualitas gambar terbaik hanya di KomikNet.`,
-    robots: {
-      index: false, // Disarankan 'false' agar Google tidak mengindeks halaman baca (mencegah duplikat)
-    }
+    robots: { index: false }
   };
-}function decodeUrlSafe(str: string): string {
+}
+
+function decodeUrlSafe(str: string): string {
   let decoded = str;
   try { decoded = decodeURIComponent(decoded); } catch(e) {}
   
@@ -46,25 +47,76 @@ async function ReaderContent({
   searchParams: Promise<{ source?: string; mangaUrl?: string }>;
 }) {
   const { id, chapterId } = await params;
-  const { source } = await searchParams;
+  const { source, mangaUrl } = await searchParams;
+
+  // PERBAIKAN FATAL: Decode ID terlebih dahulu!
+  let decodedId = id;
+  try { decodedId = decodeURIComponent(id); } catch(e) {}
 
   // ==========================================
-  // LOGIKA SUMBER ALTERNATIF
+  // LOGIKA SUMBER ALTERNATIF (Komiku, dll)
   // ==========================================
   if (source) {
     let images: string[] = [];
+    let nextChapterId = null;
     
     let finalChapterUrl = decodeUrlSafe(chapterId);
 
     try {
-      // Hanya menyisakan Komiku dan Comick
+      // 1. Ambil Gambar
       if (source === "komiku") { 
         images = await getKomikuChapterPages(finalChapterUrl);
       } else {
         images = await getComickChapterPages(finalChapterUrl, source);
       }
+
+      // 2. Cari Chapter Selanjutnya (Khusus Komiku)
+      // Gunakan decodedId yang sudah di-decode
+      if (source === "komiku" && decodedId.startsWith("komiku:")) {
+        const komikuMangaUrl = decodedId.replace("komiku:", "");
+        const mangaDetail = await getKomikuMangaDetail(komikuMangaUrl);
+
+        if (mangaDetail && mangaDetail.chapters && mangaDetail.chapters.length > 0) {
+          // Urutkan chapter
+          const sortedChapters = [...mangaDetail.chapters].sort(
+            (a, b) => (parseFloat(a.chapter) || 0) - (parseFloat(b.chapter) || 0)
+          );
+
+          // Normalisasi URL untuk pencocokan
+          const normalizeUrl = (u: string) => u.replace(/\/$/, "").toLowerCase();
+          const targetUrl = normalizeUrl(finalChapterUrl);
+
+          let currentIndex = sortedChapters.findIndex(
+            (c) => normalizeUrl(c.id) === targetUrl
+          );
+
+          // Cadangan 1: Cocokkan berdasarkan angka chapter di URL
+          if (currentIndex === -1) {
+            const match = finalChapterUrl.match(/(?:chapter|ch)-(\d+(\.\d+)?)/i);
+            if (match) {
+              const currentNum = parseFloat(match[1]);
+              currentIndex = sortedChapters.findIndex(c => (parseFloat(c.chapter) || 0) === currentNum);
+            }
+          }
+
+          // Jika ketemu, ambil chapter selanjutnya
+          if (currentIndex !== -1 && currentIndex < sortedChapters.length - 1) {
+            nextChapterId = encodeURIComponent(sortedChapters[currentIndex + 1].id);
+          }
+
+        } else {
+          // Cadangan 2 (PAMUNGKAS): Jika scraper gagal ambil list, tambahkan +1 dari URL saat ini
+          const match = finalChapterUrl.match(/chapter-(\d+(\.\d+)?)/);
+          if (match) {
+            const currentNum = parseFloat(match[1]);
+            const nextNum = currentNum + 1;
+            const nextUrl = finalChapterUrl.replace(/chapter-\d+(\.\d+)?/, `chapter-${nextNum}`);
+            nextChapterId = encodeURIComponent(nextUrl);
+          }
+        }
+      }
     } catch (err) {
-      console.log(`[READER] Gagal ambil gambar dari ${source}:`, err);
+      console.error(`[READER] Gagal memuat dari ${source}:`, err);
     }
 
     if (!images || images.length === 0) {
@@ -78,25 +130,36 @@ async function ReaderContent({
             key={index} 
             src={`/api/image?url=${encodeURIComponent(imgUrl)}`} 
             alt={`Halaman ${index + 1}`}
-            className="w-full max-w-full h-auto mb-1 md:mb-2 bg-white" 
+            // PERBAIKAN: Hapus mb-1 md:mb-2, tambahkan block
+            className="w-full max-w-full h-auto block bg-white" 
             loading="lazy"
           />
         ))}
         
-        <div className="w-full py-16 flex flex-col items-center justify-center border-t-2 border-gray-900 mt-8 bg-white font-mono text-center">
-          <h2 className="font-black text-gray-900 text-2xl uppercase tracking-tighter mb-2">
-            Akhir Chapter
-          </h2>
-          <p className="text-gray-500 text-xs uppercase tracking-widest mb-6">
-            Anda telah mencapai akhir chapter dari {source}
-          </p>
-          <Link 
-            href={`/comic/${id}`} 
-            className="inline-flex items-center gap-2 bg-[#d97706] hover:bg-[#b45309] text-white px-8 py-3 text-xs font-bold uppercase tracking-widest shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all"
-          >
-            Kembali ke Detail
-          </Link>
-        </div>
+        {/* TAMPILKAN AUTO NEXT JIKA ADA */}
+        {nextChapterId ? (
+          <AutoNext 
+            nextChapterId={nextChapterId} 
+            mangaId={id} 
+            source={source} 
+            mangaUrl={mangaUrl || komikuMangaUrlFallback(decodedId)} 
+          />
+        ) : (
+          <div className="w-full py-16 flex flex-col items-center justify-center border-t-2 border-gray-900 mt-8 bg-white font-mono text-center">
+            <h2 className="font-black text-gray-900 text-2xl uppercase tracking-tighter mb-2">
+              Akhir Chapter
+            </h2>
+            <p className="text-gray-500 text-xs uppercase tracking-widest mb-6">
+              Anda telah mencapai akhir chapter dari {source} (Chapter Terakhir)
+            </p>
+            <Link 
+              href={`/comic/${id}`} 
+              className="inline-flex items-center gap-2 bg-[#d97706] hover:bg-[#b45309] text-white px-8 py-3 text-xs font-bold uppercase tracking-widest shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all"
+            >
+              Kembali ke Detail
+            </Link>
+          </div>
+        )}
       </main>
     );
   }
@@ -156,8 +219,17 @@ async function ReaderContent({
   return <ContinuousReader initialData={initialData} mangaId={id} />;
 }
 
+// Helper untuk jaga-jaga
+function komikuMangaUrlFallback(decodedId: string) {
+  try {
+    return decodedId.replace("komiku:", "");
+  } catch {
+    return "";
+  }
+}
+
 // ==========================================
-// Komponen Error
+// Komponen Error & Halaman Utama
 // ==========================================
 function ErrorState({ id, message }: { id: string, message: string }) {
   let decodedId = id;
@@ -175,9 +247,6 @@ function ErrorState({ id, message }: { id: string, message: string }) {
   );
 }
 
-// ==========================================
-// Halaman Utama
-// ==========================================
 export default function ChapterReaderPage({ 
   params,
   searchParams
