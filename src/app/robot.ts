@@ -12,7 +12,7 @@ export default function robots(): MetadataRoute.Robots {
         '/register',
       ],
     },
-    // Arahkan ke sitemap dengan domain Vercel Anda
-    sitemap: 'https://komiknet.vercel.app/sitemap.xml',
+    // PERBAIKAN: Arahkan sitemap ke domain baru Anda
+    sitemap: 'https://komiknet.site/sitemap.xml',
   }
 }

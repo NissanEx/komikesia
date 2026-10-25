@@ -3,15 +3,17 @@ import { getPopularManga } from '@/lib/mangadex'
 import { getAnilistPopularManga } from '@/lib/anilist'
 import { getKomikuPopularManga } from '@/lib/komiku'
 
-// Tipe data dari fungsi kita
 type SitemapEntry = MetadataRoute.Sitemap[number];
 
-// Fungsi untuk mengambil semua data komik dari berbagai sumber
+// 1. Simpan data di cache agar tidak di-fetch berulang kali
+let cachedComics: any[] | null = null;
+
 async function getAllComics() {
+  if (cachedComics) return cachedComics;
+
   try {
-    // Ambil data dalam jumlah besar (misal 100-200 per sumber)
     const [mdxRes, aniRes, komikuRes] = await Promise.allSettled([
-      getPopularManga(), // Pastikan fungsi ini bisa menerima parameter limit jika perlu
+      getPopularManga(),
       getAnilistPopularManga(),
       getKomikuPopularManga(1, 100, "Semua")
     ]);
@@ -20,10 +22,10 @@ async function getAllComics() {
     const aniData = aniRes.status === "fulfilled" ? aniRes.value : [];
     const komikuData = komikuRes.status === "fulfilled" ? komikuRes.value.data : [];
 
-    // Gabungkan dan hilangkan duplikat berdasarkan ID
     const all = [...mdxData, ...aniData, ...komikuData];
     const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
     
+    cachedComics = unique;
     return unique;
   } catch (error) {
     console.error("Gagal mengambil data untuk sitemap:", error);
@@ -31,28 +33,29 @@ async function getAllComics() {
   }
 }
 
-// Fungsi generateSitemaps: Memecah sitemap menjadi beberapa file
 export async function generateSitemaps() {
   const comics = await getAllComics();
-  const CHUNK_SIZE = 100; // Maksimal 100 URL per file agar Google cepat memproses
+  const CHUNK_SIZE = 100; 
   const numberOfSitemaps = Math.ceil(comics.length / CHUNK_SIZE);
+
+  // Jika tidak ada data, setidaknya buat 1 sitemap
+  if (numberOfSitemaps === 0) return [{ id: 0 }];
 
   return Array.from({ length: numberOfSitemaps }, (_, i) => ({ id: i }));
 }
 
-// Fungsi utama pembuat sitemap
 export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://komiknet.vercel.app';
+  // 2. UBAH BASE URL KE DOMAIN BARU
+  const baseUrl = 'https://komiknet.site';
   const CHUNK_SIZE = 100;
   const comics = await getAllComics();
 
-  // Halaman statis: Hanya dimasukkan ke sitemap pertama (id: 0)
   const staticRoutes: SitemapEntry[] = id === 0 ? [
     {
       url: baseUrl,
       lastModified: new Date(),
       changeFrequency: 'daily',
-      priority: 1.0, // Prioritas tertinggi untuk halaman utama
+      priority: 1.0,
     },
     {
       url: `${baseUrl}/katalog`,
@@ -74,7 +77,6 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
     },
   ] : [];
 
-  // Halaman Dinamis: Ambil potongan data sesuai 'id' sitemap
   const start = id * CHUNK_SIZE;
   const end = start + CHUNK_SIZE;
   const chunkedComics = comics.slice(start, end);
@@ -83,7 +85,7 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
     url: `${baseUrl}/comic/${comic.id}`,
     lastModified: new Date(),
     changeFrequency: 'weekly',
-    priority: 0.8, // Prioritas tinggi untuk halaman detail komik
+    priority: 0.8,
   }));
 
   return [...staticRoutes, ...comicRoutes];
