@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowLeft, ExternalLink, Loader2, AlertTriangle } from "lucide-react";
@@ -6,8 +7,20 @@ import { getComickChapterPages } from "@/lib/comick";
 import { getKomikuChapterPages } from "@/lib/komiku";
 import ContinuousReader from "@/components/ContinuousReader";
 
-// FUNGSI SAKTI UNTUK MEMBONGKAR BASE64 / URL ENCODE BERLAPIS
-function decodeUrlSafe(str: string): string {
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string; chapterId: string }> }
+): Promise<Metadata> {
+  const { id } = await params;
+  const comicTitle = decodeURIComponent(id).split("/").pop()?.replace(/-/g, " ") || "Komik";
+  
+  return {
+    title: `Baca Chapter - ${comicTitle}`,
+    description: `Baca chapter terbaru dari ${comicTitle} dengan kualitas gambar terbaik hanya di KomikNet.`,
+    robots: {
+      index: false, // Disarankan 'false' agar Google tidak mengindeks halaman baca (mencegah duplikat)
+    }
+  };
+}function decodeUrlSafe(str: string): string {
   let decoded = str;
   try { decoded = decodeURIComponent(decoded); } catch(e) {}
   

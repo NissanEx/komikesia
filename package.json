@@ -2,13 +2,14 @@
   "name": "satisfaction-survey-evaluator",
   "version": "0.1.0",
   "private": true,
-    "scripts": {
+  "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "cheerio": "^1.2.0",
     "lucide-react": "^1.60.0",
     "next": "16.4.2",

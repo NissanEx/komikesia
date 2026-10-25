@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, LogIn, Home, LayoutGrid, Bookmark } from "lucide-react";
+import { supabase } from "@/lib/supabase"; // Import Supabase
+import { Search, LogIn, Home, LayoutGrid, Bookmark, User, LogOut } from "lucide-react";
 
 export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -17,6 +18,29 @@ export default function Header() {
     { name: "Bookmark", href: "/bookmark", icon: Bookmark },
   ];
 
+  // Cek status login dari Supabase
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    };
+    
+    checkSession();
+
+    // Dengarkan perubahan status (misal saat logout)
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => authListener.subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -27,7 +51,6 @@ export default function Header() {
 
   return (
     <header className="bg-white border-b-2 border-gray-900 sticky top-0 z-50">
-      {/* Container Utama (Satu Baris) */}
       <div className="max-w-7xl mx-auto px-2 md:px-4 h-16 md:h-20 flex flex-row items-center justify-between gap-2 md:gap-6">
         
         {/* 1. Logo CN */}
@@ -56,7 +79,7 @@ export default function Header() {
           })}
         </nav>
 
-        {/* 3. Kolom Pencarian (Mengisi Ruang Kosong di Tengah) */}
+        {/* 3. Kolom Pencarian */}
         <div className="flex-1 md:flex-none md:w-64 px-1 md:px-0">
           <form onSubmit={handleSearch} className="relative group w-full">
             <input
@@ -91,9 +114,9 @@ export default function Header() {
           })}
           
           {isLoggedIn ? (
-            <div className="w-9 h-9 border-2 border-gray-900 bg-gray-200 overflow-hidden flex-shrink-0">
-              <img src="https://i.pravatar.cc/100?img=5" alt="User" className="w-full h-full object-cover" />
-            </div>
+            <Link href="/profile" className="w-9 h-9 flex items-center justify-center bg-amber-500 border-2 border-gray-900 text-white shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] transition-all">
+              <User className="w-4 h-4" />
+            </Link>
           ) : (
             <Link
               href="/login"
@@ -107,14 +130,23 @@ export default function Header() {
         {/* 5. Autentikasi Teks (Hanya Desktop) */}
         <div className="hidden md:flex items-center gap-4 flex-shrink-0">
           {isLoggedIn ? (
-            <div className="flex items-center gap-3 cursor-pointer group">
-              <div className="text-right">
-                <p className="font-mono text-[10px] text-gray-500 uppercase tracking-widest leading-none mb-1">Selamat Datang,</p>
-                <p className="font-black text-sm uppercase tracking-tighter leading-none group-hover:text-gray-500 transition-colors">Reader One</p>
-              </div>
-              <div className="w-10 h-10 border-2 border-gray-900 bg-gray-200 overflow-hidden grayscale group-hover:grayscale-0 transition-all">
-                <img src="https://i.pravatar.cc/100?img=5" alt="User" className="w-full h-full object-cover" />
-              </div>
+            <div className="flex items-center gap-3">
+              <Link href="/profile" className="flex items-center gap-3 cursor-pointer group">
+                <div className="text-right">
+                  <p className="font-mono text-[10px] text-gray-500 uppercase tracking-widest leading-none mb-1">Profil Saya</p>
+                  <p className="font-black text-sm uppercase tracking-tighter leading-none group-hover:text-amber-600 transition-colors">Pengaturan</p>
+                </div>
+                <div className="w-10 h-10 border-2 border-gray-900 bg-amber-100 flex items-center justify-center transition-all group-hover:bg-amber-500 group-hover:text-white">
+                  <User className="w-5 h-5" />
+                </div>
+              </Link>
+              <button
+                onClick={handleLogout}
+                title="Keluar"
+                className="w-10 h-10 border-2 border-red-900 bg-white text-red-900 flex items-center justify-center hover:bg-red-900 hover:text-white transition-all shadow-[2px_2px_0px_rgba(153,27,27,1)] active:shadow-none active:translate-y-[2px]"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
             </div>
           ) : (
             <Link

@@ -9,6 +9,7 @@ import {
   pickTitle,
   getMangaBySearch,
 } from "@/lib/mangadex";
+import type { Metadata } from "next";
 import { getComickChapters } from "@/lib/comick";
 import { getKomikuMangaDetail } from "@/lib/komiku";
 import { getAnilistMangaById } from "@/lib/anilist";
@@ -417,9 +418,68 @@ function ErrorState({ msg }: { msg: string }) {
   );
 }
 
-// ==========================================
-// 4. Halaman Utama
-// ==========================================
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Metadata> {
+  const { id } = await params;
+  let decodedId = id;
+  try { decodedId = decodeURIComponent(id); } catch (e) {}
+
+  let title = "Baca Komik";
+  let description = "Baca komik terlengkap hanya di KomikNet.";
+  let image = "https://komiknet.vercel.app/default-cover.jpg"; // Fallback image
+
+  try {
+    if (decodedId.startsWith("komiku:")) {
+      const manga = await getKomikuMangaDetail(decodedId.replace("komiku:", ""));
+      if (manga) {
+        title = `Baca ${manga.title} Bahasa Indonesia`;
+        description = `Baca komik ${manga.title} online gratis. ${manga.description ? manga.description.slice(0, 150) : ""}...`;
+        image = manga.img;
+      }
+    } else if (decodedId.startsWith("anilist:")) {
+      const anilistId = Number(decodedId.replace("anilist:", ""));
+      const manga = await getAnilistMangaById(anilistId);
+      if (manga) {
+        title = `Baca ${manga.title}`;
+        description = `Baca komik ${manga.title} online. ${manga.description ? manga.description.slice(0, 150) : ""}...`;
+        image = manga.coverImage;
+      }
+    } else {
+      const mangaData = await getMangaById(decodedId);
+      if (mangaData?.data) {
+        const manga = mangaData.data;
+        const mangatitle = pickTitle(manga);
+        title = `Baca ${mangatitle}`;
+        description = `Baca komik ${mangatitle} online.`;
+        const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
+        if (coverArt?.attributes?.fileName) {
+          image = `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("SEO Metadata Error:", error);
+  }
+
+  return {
+    title: title,
+    description: description,
+    openGraph: {
+      title: title,
+      description: description,
+      images: [{ url: image }],
+      type: "article",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: title,
+      description: description,
+      images: [image],
+    },
+  };
+}
+
 export default function ComicDetailPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans selection:bg-amber-500 selection:text-white pb-20">

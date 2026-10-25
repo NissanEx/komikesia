@@ -12,15 +12,37 @@ import { getKomikuPopularManga } from "@/lib/komiku";
 
 async function HeroServer() {
   await connection();
-  const res = await getPopularManga();
-  const heroSamples = res.data.slice(0, 10); 
+  
+  // Ambil data dari 3 sumber untuk Hero
+  const results = await Promise.allSettled([
+    getPopularManga(),
+    getAnilistPopularManga(),
+    getKomikuPopularManga(1)
+  ]);
+
+  const mdxData = results[0].status === "fulfilled" ? results[0].value.data : [];
+  const aniData = results[1].status === "fulfilled" ? results[1].value : [];
+  const komikuData = results[2].status === "fulfilled" ? results[2].value.data : [];
+
+  // Gabungkan dan acak sedikit agar bervariasi
+  const combined = [...mdxData, ...aniData, ...komikuData];
+  
+  // Ambil 10 untuk Hero
+  const heroSamples = combined.slice(0, 10).map((c: any) => ({
+    id: c.id,
+    title: c.title,
+    img: c.img,
+    type: c.type || "Manga",
+    rating: c.rating || c.averageScore || 0,
+    chapters: c.chapters || "?"
+  }));
+
   return <Hero mangas={heroSamples} />;
 }
 
 async function PopularComics() {
   await connection();
   
-  // Hanya memanggil 3 sumber
   const results = await Promise.allSettled([
     getPopularManga(),
     getAnilistPopularManga(),
@@ -40,7 +62,6 @@ async function PopularComics() {
   let count = 0;
   const limit = 20;
 
-  // Looping Interleaving (MangaDex -> Komiku -> AniList)
   while (count < limit) {
     let added = false;
     if (mdxIdx < mdxData.length) { combined.push(mdxData[mdxIdx++]); count++; added = true; }

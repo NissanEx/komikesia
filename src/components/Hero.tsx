@@ -107,8 +107,9 @@ export default function Hero({ mangas }: { mangas?: HeroManga[] }) {
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
         {displayList.map((manga) => {
-          const isUrl = manga.id.startsWith("http");
-          const href = isUrl ? `/search?q=${encodeURIComponent(manga.title)}` : `/comic/${manga.id}`;
+          // PERBAIKAN: Deteksi URL jika id berawalan http (untuk legacy) atau langsung gunakan path comic
+          const isExternalUrl = manga.id.startsWith("http");
+          const href = isExternalUrl ? `/search?q=${encodeURIComponent(manga.title)}` : `/comic/${manga.id}`;
           const isSaved = savedIds.includes(manga.id);
 
           return (

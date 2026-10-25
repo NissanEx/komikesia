@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { BookmarkX } from "lucide-react"; // ArrowLeft sudah dihapus
+import { BookmarkX, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase"; // Import Supabase
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -13,31 +14,79 @@ type BookmarkedComic = {
   img: string;
   type: string;
   chapters: string;
-  readers: string;
+  readers?: string;
 };
 
 export default function BookmarkPage() {
   const [bookmarks, setBookmarks] = useState<BookmarkedComic[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Ambil data bookmark dari localStorage saat halaman dimuat
+  // Ambil data bookmark dari Supabase atau localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("komik_bookmarks");
-    if (saved) {
+    const fetchBookmarks = async () => {
       try {
-        setBookmarks(JSON.parse(saved));
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          // JIKA LOGIN: Ambil dari Supabase
+          const { data, error } = await supabase
+            .from("bookmarks")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+          if (!error && data) {
+            // Map data dari Supabase agar sesuai dengan format BookmarkedComic
+            const formattedData = data.map((b: any) => ({
+              id: b.comic_id,
+              title: b.title,
+              img: b.img,
+              type: b.type,
+              chapters: b.chapters,
+              readers: "0"
+            }));
+            setBookmarks(formattedData);
+          }
+        } else {
+          // JIKA GUEST: Ambil dari localStorage
+          const saved = localStorage.getItem("komik_bookmarks");
+          if (saved) {
+            setBookmarks(JSON.parse(saved));
+          }
+        }
       } catch (e) {
         console.error("Gagal membaca bookmark", e);
+      } finally {
+        setIsLoaded(true);
       }
-    }
-    setIsLoaded(true);
+    };
+
+    fetchBookmarks();
   }, []);
 
   // Fungsi untuk menghapus bookmark
-  const removeBookmark = (id: string) => {
-    const updated = bookmarks.filter((b) => b.id !== id);
-    setBookmarks(updated);
-    localStorage.setItem("komik_bookmarks", JSON.stringify(updated));
+  const removeBookmark = async (id: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session) {
+        // JIKA LOGIN: Hapus dari Supabase
+        await supabase
+          .from("bookmarks")
+          .delete()
+          .eq("user_id", session.user.id)
+          .eq("comic_id", id);
+      } else {
+        // JIKA GUEST: Hapus dari localStorage
+        const updated = bookmarks.filter((b) => b.id !== id);
+        localStorage.setItem("komik_bookmarks", JSON.stringify(updated));
+      }
+
+      // Update state di UI
+      setBookmarks((prev) => prev.filter((b) => b.id !== id));
+      
+    } catch (error) {
+      console.error("Gagal menghapus bookmark", error);
+    }
   };
 
   return (
@@ -46,7 +95,7 @@ export default function BookmarkPage() {
       
       <main className="max-w-7xl mx-auto px-4 py-12">
         
-        {/* Header Halaman Bookmark (Hanya Judul) */}
+        {/* Header Halaman Bookmark */}
         <div className="mb-10 border-b-2 border-gray-900 pb-6">
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
             Bookmark
@@ -55,7 +104,8 @@ export default function BookmarkPage() {
 
         {/* Konten */}
         {!isLoaded ? (
-          <div className="text-center py-20 font-mono text-sm uppercase tracking-widest animate-pulse">
+          <div className="flex flex-col items-center justify-center py-20 font-mono text-sm uppercase tracking-widest">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-500 mb-4" />
             Memuat koleksi...
           </div>
         ) : bookmarks.length === 0 ? (
