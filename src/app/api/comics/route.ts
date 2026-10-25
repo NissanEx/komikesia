@@ -130,12 +130,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: sorted.slice(offset, offset + limit), total: sorted.length }, { headers: noCacheHeaders });
     }
 
-    // ==========================================
-    // 3. LOGIKA SEMUA SUMBER (GABUNGAN) - FIXED
-    // ==========================================
-    // Ambil data dalam jumlah besar agar bisa disortir dan dipaginasi dengan benar
-    const fetchLimit = Math.min(page * limit + 20, 100); 
-    
+const fetchLimit = Math.min(page * limit + 20, 2000); 
     const results = await Promise.allSettled([
       getMangaByCategory(category, sort, 1, fetchLimit), // Ambil dari halaman 1 sebanyak fetchLimit
       getAnilistPopularManga(),

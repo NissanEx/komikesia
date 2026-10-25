@@ -111,34 +111,50 @@ function parseKomikuPage(html: string): any[] {
 
   return comics;
 }
+// lib/komiku.ts
+
 export async function getKomikuPopularManga(page: number = 1, limit: number = 20, category: string = "Semua"): Promise<{ data: any[], total: number }> {
   try {
-    const apiPage1 = (page - 1) * 2 + 1;
-    const apiPage2 = apiPage1 + 1;
-
-    // Hanya fetch 2 halaman secara paralel (jauh lebih cepat)
-    const [html1, html2] = await Promise.all([
-      fetchHtml(`${KOMIKU_API}/manga/page/${apiPage1}/`),
-      fetchHtml(`${KOMIKU_API}/manga/page/${apiPage2}/`)
-    ]);
-
-    const comics1 = html1 ? parseKomikuPage(html1) : [];
-    const comics2 = html2 ? parseKomikuPage(html2) : [];
+    let allComics: any[] = [];
     
-    let combined = [...comics1, ...comics2];
+    // TARIK BANYAK HALAMAN: Kita tarik 100 halaman sekaligus untuk mendapatkan SELURUH data.
+    // 100 halaman kira-kira berisi 1000-1500 judul komik mentah.
+    const pagesToFetch = 100; 
+    
+    // Buat array promise untuk fetch 100 halaman secara bersamaan
+    const fetchPromises = Array.from({ length: pagesToFetch }, (_, i) => 
+      fetchHtml(`${KOMIKU_API}/manga/page/${i + 1}/`)
+    );
 
+    // Eksekusi semua fetch secara paralel (cepat)
+    const htmlResults = await Promise.all(fetchPromises);
+    
+    // Gabungkan semua hasil HTML
+    htmlResults.forEach(html => {
+      if (html) {
+        allComics = [...allComics, ...parseKomikuPage(html)];
+      }
+    });
+
+    // Filter berdasarkan Kategori (Manhua/Manhwa/Manga)
     if (category !== "Semua") {
-      combined = combined.filter((c) => c.type.toLowerCase() === category.toLowerCase());
+      allComics = allComics.filter((c) => c.type.toLowerCase() === category.toLowerCase());
     }
 
+    // Hapus duplikat
     const seen = new Set<string>();
-    const uniqueComics = combined.filter((c) => {
+    const uniqueComics = allComics.filter((c) => {
       if (seen.has(c.id)) return false;
       seen.add(c.id);
       return true;
     });
 
-    return { data: uniqueComics.slice(0, limit), total: 1000 };
+    // Paginasi (potong data sesuai halaman yang diminta, misal 20 per halaman)
+    const offset = (page - 1) * limit;
+    const paginatedData = uniqueComics.slice(offset, offset + limit);
+
+    // Kembalikan data halaman ini, dan total keseluruhan komik yang berhasil ditarik
+    return { data: paginatedData, total: uniqueComics.length };
   } catch (error) {
     console.error("[KOMIKU] Gagal ambil populer:", error);
     return { data: [], total: 0 };
