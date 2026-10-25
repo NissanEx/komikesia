@@ -10,10 +10,12 @@ import { getPopularManga } from "@/lib/mangadex";
 import { getAnilistPopularManga } from "@/lib/anilist";
 import { getKomikuPopularManga } from "@/lib/komiku";
 
+// TAMBAHKAN BARIS INI: Memaksa halaman menjadi dinamis (Server-Side Rendering)
+export const dynamic = 'force-dynamic';
+
 async function HeroServer() {
   await connection();
   
-  // Ambil data dari 3 sumber untuk Hero
   const results = await Promise.allSettled([
     getPopularManga(),
     getAnilistPopularManga(),
@@ -24,10 +26,8 @@ async function HeroServer() {
   const aniData = results[1].status === "fulfilled" ? results[1].value : [];
   const komikuData = results[2].status === "fulfilled" ? results[2].value.data : [];
 
-  // Gabungkan dan acak sedikit agar bervariasi
   const combined = [...mdxData, ...aniData, ...komikuData];
   
-  // Ambil 10 untuk Hero
   const heroSamples = combined.slice(0, 10).map((c: any) => ({
     id: c.id,
     title: c.title,

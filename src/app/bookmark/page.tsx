@@ -1,9 +1,12 @@
 "use client";
 
+// TAMBAHKAN BARIS INI: Mencegah Next.js melakukan prerender statis pada halaman ini
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { BookmarkX, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase"; // Import Supabase
+import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -21,7 +24,6 @@ export default function BookmarkPage() {
   const [bookmarks, setBookmarks] = useState<BookmarkedComic[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Ambil data bookmark dari Supabase atau localStorage
   useEffect(() => {
     const fetchBookmarks = async () => {
       try {
@@ -35,7 +37,6 @@ export default function BookmarkPage() {
             .order("created_at", { ascending: false });
 
           if (!error && data) {
-            // Map data dari Supabase agar sesuai dengan format BookmarkedComic
             const formattedData = data.map((b: any) => ({
               id: b.comic_id,
               title: b.title,
@@ -63,7 +64,6 @@ export default function BookmarkPage() {
     fetchBookmarks();
   }, []);
 
-  // Fungsi untuk menghapus bookmark
   const removeBookmark = async (id: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -81,7 +81,6 @@ export default function BookmarkPage() {
         localStorage.setItem("komik_bookmarks", JSON.stringify(updated));
       }
 
-      // Update state di UI
       setBookmarks((prev) => prev.filter((b) => b.id !== id));
       
     } catch (error) {
@@ -95,14 +94,12 @@ export default function BookmarkPage() {
       
       <main className="max-w-7xl mx-auto px-4 py-12">
         
-        {/* Header Halaman Bookmark */}
         <div className="mb-10 border-b-2 border-gray-900 pb-6">
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
             Bookmark
           </h1>
         </div>
 
-        {/* Konten */}
         {!isLoaded ? (
           <div className="flex flex-col items-center justify-center py-20 font-mono text-sm uppercase tracking-widest">
             <Loader2 className="w-8 h-8 animate-spin text-amber-500 mb-4" />
@@ -127,7 +124,6 @@ export default function BookmarkPage() {
             {bookmarks.map((comic) => (
               <div key={comic.id} className="group relative">
                 
-                {/* Card Komik */}
                 <Link href={`/comic/${comic.id}`} className="block bg-white border-2 border-gray-900 flex flex-col h-full transition-all duration-300 group-hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] group-hover:-translate-y-1 group-hover:-translate-x-1">
                   <div className="relative aspect-[3/4] overflow-hidden border-b-2 border-gray-900 bg-gray-100">
                     <img 
@@ -151,7 +147,6 @@ export default function BookmarkPage() {
                   </div>
                 </Link>
 
-                {/* Tombol Hapus Bookmark (Muncul saat Hover) */}
                 <button 
                   onClick={() => removeBookmark(comic.id)}
                   className="absolute top-2 left-2 bg-red-600 text-white p-2 border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-700"
