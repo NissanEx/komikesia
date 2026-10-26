@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase"; // Import Supabase
+import { supabase } from "@/lib/supabase";
 import { 
   ArrowLeft, Check, Crown, Sparkles, ShieldCheck, 
   CreditCard, RefreshCcw, XCircle, Loader2
@@ -10,15 +10,11 @@ import {
 
 export default function SubscriptionPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
-  
-  // State untuk loading saat memanggil API Midtrans
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // FUNGSI UNTUK MEMICU MIDTRANS
   const handlePayment = async () => {
     setIsProcessing(true);
     try {
-      // 1. Ambil data user yang sedang login dari Supabase
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -26,7 +22,6 @@ export default function SubscriptionPage() {
         return;
       }
 
-      // 2. Tembak API backend kita (api/checkout) untuk minta Token Midtrans
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,13 +34,12 @@ export default function SubscriptionPage() {
       
       const data = await res.json();
       
-      // 3. Jika token didapat, munculkan Pop-up Midtrans
       if (data.token) {
-        // @ts-ignore (Mengabaikan error TypeScript karena window.snap berasal dari script luar)
+        // @ts-ignore
         window.snap.pay(data.token, {
           onSuccess: function (result: any) {
             alert("Pembayaran Berhasil! Akun Anda sekarang Premium.");
-            window.location.href = "/profile"; // Arahkan ke halaman profil
+            window.location.href = "/profile";
           },
           onPending: function (result: any) {
             alert("Menunggu pembayaran Anda!");
@@ -117,7 +111,7 @@ export default function SubscriptionPage() {
                 billingCycle === "yearly" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              Tahunan <span className="bg-amber-400 text-black px-1 text-[9px]">HEMAT 20%</span>
+              Tahunan <span className="bg-amber-400 text-black px-1 text-[9px]">HEMAT 88%</span>
             </button>
           </div>
         </div>
@@ -144,15 +138,22 @@ export default function SubscriptionPage() {
 
           {/* CARD 2: PREMIUM */}
           <div className="bg-white border-2 border-gray-900 p-8 flex flex-col relative shadow-[8px_8px_0px_rgba(0,0,0,1)] transform md:-translate-y-2">
-            <div className="absolute top-0 right-0 bg-amber-500 text-white font-mono text-[10px] font-bold uppercase tracking-widest px-3 py-1 border-b-2 border-l-2 border-gray-900">
-              Paling Populer
+            <div className="absolute top-0 right-0 bg-red-600 text-white font-mono text-[10px] font-bold uppercase tracking-widest px-3 py-1 border-b-2 border-l-2 border-gray-900">
+              PROMO 88%
             </div>
             <h3 className="font-mono text-sm font-bold uppercase tracking-widest text-amber-600 mb-2 flex items-center gap-2">
               <Sparkles className="w-4 h-4" /> Premium Tier
             </h3>
-            <div className="text-4xl font-black mb-6">
-              {billingCycle === "monthly" ? "Rp 25.000" : "Rp 240.000"} 
-              <span className="text-sm font-normal text-gray-500"> / {billingCycle === "monthly" ? "bulan" : "tahun"}</span>
+            
+            {/* HARGA DISKON */}
+            <div className="flex flex-col mb-6">
+              <span className="text-gray-400 line-through font-mono text-sm">
+                {billingCycle === "monthly" ? "Rp 25.000" : "Rp 300.000"}
+              </span>
+              <div className="text-5xl font-black text-gray-900">
+                {billingCycle === "monthly" ? "Rp 3.000" : "Rp 36.000"} 
+                <span className="text-sm font-normal text-gray-500"> / {billingCycle === "monthly" ? "bulan" : "tahun"}</span>
+              </div>
             </div>
             
             <ul className="space-y-4 mb-8 flex-1">
@@ -162,7 +163,6 @@ export default function SubscriptionPage() {
               <li className="flex items-center gap-3 text-sm font-medium"><Check className="w-4 h-4 text-green-500" /> Badge eksklusif di profil</li>
             </ul>
             
-            {/* TOMBOL PEMBAYARAN YANG SUDAH TERHUBUNG KE MIDTRANS */}
             <button 
               onClick={handlePayment}
               disabled={isProcessing}
@@ -173,7 +173,7 @@ export default function SubscriptionPage() {
                   <Loader2 className="w-4 h-4 animate-spin" /> Memproses...
                 </>
               ) : (
-                "Lanjut ke Pembayaran"
+                "Klaim Promo Sekarang"
               )}
             </button>
           </div>

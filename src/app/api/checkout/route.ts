@@ -19,8 +19,7 @@ export async function POST(req: Request) {
     console.log("Menggunakan Server Key:", serverKey.substring(0, 15) + "...");
     console.log("Mode Production:", isProduction);
 
-    const price = plan === "yearly" ? 240000 : 25000;
-
+   const price = plan === "yearly" ? 36000 : 3000;
     // 2. Inisialisasi Midtrans
     let snap = new midtransClient.Snap({
       isProduction: isProduction,

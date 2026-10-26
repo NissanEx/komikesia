@@ -62,7 +62,7 @@ function ComicInfo({ manga }: { manga: any }) {
   const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
   const coverUrl = coverArt?.attributes?.fileName
     ? `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`
-    : "https://via.placeholder.com/400x600?text=No+Image";
+    : "https://komiknet.site/default-cover.jpg"; // Domain diperbarui
 
   const tags = manga.attributes.tags.slice(0, 3).map((t: any) => t.attributes.name.en).join(" · ");
 
@@ -112,7 +112,7 @@ function ComicInfo({ manga }: { manga: any }) {
         <div className="lg:col-span-5 relative group self-start">
           <div className="absolute inset-0 border border-gray-400 translate-x-3 translate-y-3 pointer-events-none"></div>
           <div className="overflow-hidden border border-gray-900 relative z-10 bg-gray-100">
-            <img src={`/api/image?url=${encodeURIComponent(coverUrl)}`} alt={title} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={`/api/image?url=${encodeURIComponent(coverUrl)}`} alt={`Cover komik ${title}`} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
           </div>
           <div className="absolute top-4 -left-4 bg-white border border-gray-900 px-3 py-1 font-mono text-sm shadow-[2px_2px_0px_rgba(0,0,0,1)] z-20">
             ★ {manga.attributes.tags.length || "N/A"} STATS
@@ -184,7 +184,7 @@ function AnilistComicInfo({ manga }: { manga: any }) {
         <div className="lg:col-span-5 relative group self-start">
           <div className="absolute inset-0 border border-gray-400 translate-x-3 translate-y-3 pointer-events-none"></div>
           <div className="overflow-hidden border border-gray-900 relative z-10 bg-gray-100">
-            <img src={`/api/image?url=${encodeURIComponent(manga.coverImage)}`} alt={manga.title} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={`/api/image?url=${encodeURIComponent(manga.coverImage)}`} alt={`Cover komik ${manga.title}`} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
           </div>
           <div className="absolute top-4 -left-4 bg-white border border-gray-900 px-3 py-1 font-mono text-sm shadow-[2px_2px_0px_rgba(0,0,0,1)] z-20">
             ★ {manga.averageScore || 0}/10
@@ -243,7 +243,7 @@ function KomikuComicInfo({ manga }: { manga: any }) {
         <div className="lg:col-span-5 relative group self-start">
           <div className="absolute inset-0 border border-gray-400 translate-x-3 translate-y-3 pointer-events-none"></div>
           <div className="overflow-hidden border border-gray-900 relative z-10 bg-gray-100">
-            <img src={`/api/image?url=${encodeURIComponent(manga.img)}`} alt={manga.title} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={`/api/image?url=${encodeURIComponent(manga.img)}`} alt={`Cover komik ${manga.title}`} className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105" />
           </div>
         </div>
       </div>
@@ -314,7 +314,7 @@ async function ComicChapters({ id, titles, lastChapter }: { id: string; titles: 
 }
 
 // ==========================================
-// 3. Wrapper Params (Anti-Crash Ekstrem)
+// 3. Wrapper Params & JSON-LD (SEO)
 // ==========================================
 async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }> }) {
   let id = "";
@@ -336,6 +336,15 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
     try { manga = await getAnilistMangaById(anilistId); } catch (e) {}
     if (!manga) return <ErrorState msg="Data AniList Terputus" />;
 
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "ComicSeries",
+      name: manga.title,
+      image: manga.coverImage,
+      description: (manga.description || "").replace(/<[^>]*>?/gm, ''),
+      url: `https://komiknet.site/comic/${id}`
+    };
+
     let matchId = "unknown";
     let matchTitle = manga.title;
     try {
@@ -348,6 +357,10 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
 
     return (
       <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <AnilistComicInfo manga={manga} />
         <Suspense fallback={<LoadingState />}>
           <ComicChapters id={matchId} titles={[matchTitle, manga.title]} lastChapter={null} />
@@ -363,6 +376,15 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
     try { manga = await getKomikuMangaDetail(komikuUrl); } catch (e) {}
     if (!manga) return <ErrorState msg="Data Komiku Terputus" />;
 
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "ComicSeries",
+      name: manga.title,
+      image: manga.img,
+      description: (manga.description || "").replace(/<[^>]*>?/gm, ''),
+      url: `https://komiknet.site/comic/${id}`
+    };
+
     const formattedChapters: ChapterItem[] = (manga.chapters || []).map((c: any) => ({
       id: encodeURIComponent(c.id),
       attributes: { chapter: c.chapter, title: c.title, publishAt: c.publishAt, translatedLanguage: "id", nyoraSource: "komiku", nyoraMangaUrl: manga.url, sourceName: "Komiku" }
@@ -371,6 +393,10 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
     
     return (
       <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <KomikuComicInfo manga={manga} />
         <div id="chapter-list" className="mt-12">
           <div className="flex items-end justify-between border-b-2 border-gray-900 pb-4 mb-6">
@@ -394,8 +420,26 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
   const titles = getTitleCandidates(manga);
   const lastChapter = manga.attributes.lastChapter || null;
 
+  const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
+  const coverUrl = coverArt?.attributes?.fileName
+    ? `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`
+    : "https://komiknet.site/default-cover.jpg";
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ComicSeries",
+    name: pickTitle(manga),
+    image: coverUrl,
+    description: (manga.attributes.description?.en || "").replace(/<[^>]*>?/gm, ''),
+    url: `https://komiknet.site/comic/${id}`
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ComicInfo manga={manga} />
       <Suspense fallback={<LoadingState />}>
         <ComicChapters id={id} titles={titles} lastChapter={lastChapter} />
@@ -418,6 +462,9 @@ function ErrorState({ msg }: { msg: string }) {
   );
 }
 
+// ==========================================
+// 4. Metadata Dinamis (SEO Friendly)
+// ==========================================
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
@@ -427,22 +474,24 @@ export async function generateMetadata(
 
   let title = "Baca Komik";
   let description = "Baca komik terlengkap hanya di KomikNet.";
-  let image = "https://komiknet.vercel.app/default-cover.jpg"; // Fallback image
+  let image = "https://komiknet.site/default-cover.jpg"; // Domain diperbarui
 
   try {
     if (decodedId.startsWith("komiku:")) {
       const manga = await getKomikuMangaDetail(decodedId.replace("komiku:", ""));
       if (manga) {
-        title = `Baca ${manga.title} Bahasa Indonesia`;
-        description = `Baca komik ${manga.title} online gratis. ${manga.description ? manga.description.slice(0, 150) : ""}...`;
+        title = `Baca ${manga.title} Bahasa Indonesia Terlengkap`;
+        const cleanDesc = (manga.description || "").replace(/<[^>]*>?/gm, '');
+        description = `Baca komik ${manga.title} online gratis. ${cleanDesc.slice(0, 150)}...`;
         image = manga.img;
       }
     } else if (decodedId.startsWith("anilist:")) {
       const anilistId = Number(decodedId.replace("anilist:", ""));
       const manga = await getAnilistMangaById(anilistId);
       if (manga) {
-        title = `Baca ${manga.title}`;
-        description = `Baca komik ${manga.title} online. ${manga.description ? manga.description.slice(0, 150) : ""}...`;
+        title = `Baca ${manga.title} Bahasa Indonesia`;
+        const cleanDesc = (manga.description || "").replace(/<[^>]*>?/gm, '');
+        description = `Baca komik ${manga.title} online. ${cleanDesc.slice(0, 150)}...`;
         image = manga.coverImage;
       }
     } else {
@@ -450,8 +499,11 @@ export async function generateMetadata(
       if (mangaData?.data) {
         const manga = mangaData.data;
         const mangatitle = pickTitle(manga);
-        title = `Baca ${mangatitle}`;
-        description = `Baca komik ${mangatitle} online.`;
+        title = `Baca ${mangatitle} Bahasa Indonesia - Chapter Terbaru`;
+        const descObj = manga.attributes.description || {};
+        const rawDesc = descObj.en || descObj.id || Object.values(descObj)[0] || "Belum ada deskripsi.";
+        description = `Baca komik ${mangatitle} online. ${rawDesc.slice(0, 150)}...`;
+        
         const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
         if (coverArt?.attributes?.fileName) {
           image = `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`;
@@ -462,24 +514,34 @@ export async function generateMetadata(
     console.error("SEO Metadata Error:", error);
   }
 
+  const fullTitle = `${title} | KomikNet`;
+
   return {
-    title: title,
+    title: fullTitle,
     description: description,
+    alternates: {
+      canonical: `https://komiknet.site/comic/${id}`,
+    },
     openGraph: {
-      title: title,
+      title: fullTitle,
       description: description,
       images: [{ url: image }],
       type: "article",
+      url: `https://komiknet.site/comic/${id}`,
+      siteName: "KomikNet",
     },
     twitter: {
       card: "summary_large_image",
-      title: title,
+      title: fullTitle,
       description: description,
       images: [image],
     },
   };
 }
 
+// ==========================================
+// 5. Halaman Utama
+// ==========================================
 export default function ComicDetailPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans selection:bg-amber-500 selection:text-white pb-20">
