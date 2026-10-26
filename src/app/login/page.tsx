@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase"; // Import Supabase
-import { Mail, Lock, ArrowRight, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Mail, Lock, ArrowRight, ArrowLeft, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,13 +12,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg("");
+    setSuccessMsg("");
 
-    // Proses Login ke Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
@@ -28,9 +29,36 @@ export default function LoginPage() {
       setErrorMsg(error.message);
       setIsLoading(false);
     } else {
-      // Jika berhasil, arahkan ke halaman profil
       router.push("/profile");
-      router.refresh(); // Refresh state server agar header berubah
+      router.refresh();
+    }
+  };
+
+  // FUNGSI RESET PASSWORD
+  const handleForgotPassword = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setErrorMsg("Silakan masukkan email Anda terlebih dahulu di kolom Email.");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // Ini adalah halaman yang akan dibuka setelah user klik link di email
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+
+      if (error) throw error;
+
+      setSuccessMsg("Link reset password telah dikirim! Silakan cek kotak masuk (atau folder Spam) email Anda.");
+    } catch (error: any) {
+      setErrorMsg(error.message || "Gagal mengirim email reset password.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -48,7 +76,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md mx-auto">
           <div className="mb-10">
             <div className="bg-gray-900 text-white w-12 h-12 flex items-center justify-center font-black text-xl mb-6 shadow-[4px_4px_0px_rgba(0,0,0,0.2)]">
-              CN
+              KN
             </div>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-gray-900 mb-2">
               Sign In
@@ -58,10 +86,15 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Notifikasi Error */}
+          {/* Notifikasi Error & Sukses */}
           {errorMsg && (
             <div className="mb-6 bg-red-100 border-2 border-red-900 text-red-900 p-3 font-mono text-xs font-bold uppercase flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> {errorMsg}
+              <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+            </div>
+          )}
+          {successMsg && (
+            <div className="mb-6 bg-green-100 border-2 border-green-900 text-green-900 p-3 font-mono text-xs font-bold uppercase flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" /> {successMsg}
             </div>
           )}
 
@@ -90,9 +123,13 @@ export default function LoginPage() {
                 <label className="block font-mono text-xs font-bold uppercase tracking-widest text-gray-900">
                   Password
                 </label>
-                <Link href="#" className="font-mono text-xs text-amber-600 hover:text-amber-700 hover:underline">
+                <button 
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="font-mono text-xs text-amber-600 hover:text-amber-700 hover:underline"
+                >
                   Lupa Password?
-                </Link>
+                </button>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -133,7 +170,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
         <div className="relative z-10 text-center px-12">
           <h2 className="text-6xl md:text-8xl font-black text-white/10 uppercase tracking-tighter leading-none select-none">
-            KOMIK<br/>SETYA
+            COMIC<br/>NETWORK
           </h2>
           <div className="mt-8 border-2 border-amber-500 p-6 bg-[#111]/80 backdrop-blur-sm shadow-[8px_8px_0px_rgba(217,119,6,0.5)]">
             <p className="font-serif text-xl italic text-gray-300">

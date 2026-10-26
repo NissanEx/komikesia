@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase"; // Sesuaikan path import dengan project Anda
+import { supabase } from "@/lib/supabase";
 import { 
   User, Mail, Crown, Shield, LogOut, ArrowLeft, 
-  CheckCircle2, Loader2, Save
+  CheckCircle2, Loader2, Save, Lock
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -20,6 +20,12 @@ export default function ProfilePage() {
     is_premium: false,
   });
   const [message, setMessage] = useState({ type: "", text: "" });
+
+  // --- STATE UNTUK UBAH PASSWORD ---
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // 1. Fetch Data dari Supabase saat halaman dimuat
   useEffect(() => {
@@ -70,22 +76,36 @@ export default function ProfilePage() {
     setSaving(false);
   };
 
-  // 3. Fungsi Simulasi Upgrade Langganan
-  const handleUpgrade = async () => {
-    const confirm = window.confirm("Apakah Anda yakin ingin berlangganan Premium? (Simulasi)");
-    if (!confirm) return;
+  // 3. Fungsi Ubah Password
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage({ type: "", text: "" });
 
-    setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_premium: true })
-      .eq("id", user.id);
-
-    if (!error) {
-      setProfile((prev) => ({ ...prev, is_premium: true }));
-      setMessage({ type: "success", text: "Selamat! Anda sekarang Premium." });
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: "error", text: "Konfirmasi password tidak cocok!" });
+      return;
     }
-    setSaving(false);
+
+    if (newPassword.length < 6) {
+      setMessage({ type: "error", text: "Password minimal 6 karakter." });
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      setMessage({ type: "error", text: `Gagal: ${error.message}` });
+    } else {
+      setMessage({ type: "success", text: "Password berhasil diubah!" });
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordForm(false); // Sembunyikan form setelah sukses
+    }
+    setIsUpdatingPassword(false);
   };
 
   // 4. Fungsi Logout
@@ -120,7 +140,7 @@ export default function ProfilePage() {
           <div className={`mb-8 p-4 border-2 font-mono text-sm font-bold uppercase tracking-widest flex items-center gap-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] ${
             message.type === "success" ? "bg-green-100 border-green-900 text-green-900" : "bg-red-100 border-red-900 text-red-900"
           }`}>
-            <CheckCircle2 className="w-5 h-5" /> {message.text}
+            <CheckCircle2 className="w-5 h-5 shrink-0" /> {message.text}
           </div>
         )}
 
@@ -197,7 +217,7 @@ export default function ProfilePage() {
 
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || isUpdatingPassword}
                   className="bg-gray-900 text-white font-mono font-bold uppercase tracking-widest py-3 px-8 flex items-center gap-2 hover:bg-gray-800 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,0.3)] active:shadow-none active:translate-y-1 disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -241,33 +261,95 @@ export default function ProfilePage() {
                       Anda Sudah Premium
                     </button>
                   ) : (
-                    <button
-                      onClick={handleUpgrade}
-                      disabled={saving}
-                      className="w-full bg-[#d97706] border-2 border-gray-900 text-white font-mono font-bold uppercase tracking-widest py-4 px-8 flex items-center justify-center gap-2 hover:bg-[#b45309] transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 disabled:opacity-50"
+                    <Link
+                      href="/subscription"
+                      className="w-full bg-[#d97706] border-2 border-gray-900 text-white font-mono font-bold uppercase tracking-widest py-4 px-8 flex items-center justify-center gap-2 hover:bg-[#b45309] transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 text-center"
                     >
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                      Upgrade Sekarang
-                    </button>
+                      <Crown className="w-4 h-4" />
+                      Lihat Penawaran
+                    </Link>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* SECTION 3: KEAMANAN */}
+            {/* SECTION 3: KEAMANAN (UBAH PASSWORD) */}
             <div className="bg-white border-2 border-gray-900 p-6 md:p-8 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
               <h3 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2 border-b-2 border-gray-900 pb-4">
                 <Shield className="w-6 h-6" /> Keamanan
               </h3>
-              <p className="font-mono text-sm text-gray-600 mb-4">
-                Ingin mengganti password atau mengelola keamanan akun? Klik tombol di bawah ini.
-              </p>
-              <button 
-                onClick={() => alert("Fitur ganti password akan segera hadir!")}
-                className="bg-white border-2 border-gray-900 text-gray-900 font-mono font-bold uppercase tracking-widest py-3 px-6 hover:bg-gray-100 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1"
-              >
-                Ubah Password
-              </button>
+              
+              {!showPasswordForm ? (
+                <>
+                  <p className="font-mono text-sm text-gray-600 mb-4">
+                    Ingin mengganti password atau mengelola keamanan akun? Klik tombol di bawah ini.
+                  </p>
+                  <button 
+                    onClick={() => setShowPasswordForm(true)}
+                    className="bg-white border-2 border-gray-900 text-gray-900 font-mono font-bold uppercase tracking-widest py-3 px-6 hover:bg-gray-100 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1"
+                  >
+                    Ubah Password
+                  </button>
+                </>
+              ) : (
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div>
+                    <label className="block font-mono text-xs font-bold uppercase tracking-widest text-gray-900 mb-2">Password Baru</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Lock className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        className="w-full bg-white border-2 border-gray-900 text-gray-900 font-mono text-sm py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-amber-500"
+                        placeholder="Minimal 6 karakter"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-mono text-xs font-bold uppercase tracking-widest text-gray-900 mb-2">Konfirmasi Password Baru</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Lock className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        className="w-full bg-white border-2 border-gray-900 text-gray-900 font-mono text-sm py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-amber-500"
+                        placeholder="Ketik ulang password baru"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 pt-2">
+                    <button
+                      type="submit"
+                      disabled={isUpdatingPassword}
+                      className="bg-amber-500 text-black font-mono font-bold uppercase tracking-widest py-3 px-6 hover:bg-amber-400 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,0.3)] active:shadow-none active:translate-y-1 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isUpdatingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Simpan Password
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPasswordForm(false);
+                        setNewPassword("");
+                        setConfirmPassword("");
+                      }}
+                      className="bg-white border-2 border-gray-900 text-gray-900 font-mono font-bold uppercase tracking-widest py-3 px-6 hover:bg-gray-100 transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
 
           </div>

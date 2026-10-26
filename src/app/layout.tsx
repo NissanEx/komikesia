@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
+ import DownloadAppModal from "@/components/DownloadAppModal";// 1. Tambahkan import Script dari next/script
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  // Gunakan URL Vercel Anda saat ini
-  metadataBase: new URL("https://komiknet.vercel.app"), 
+  metadataBase: new URL("https://komiknet.site"), 
   title: {
     default: "KomikNet - Baca Komik, Manga, Manhwa, Manhua Terlengkap",
     template: "%s | KomikNet", 
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "id_ID",
-    url: "https://komiknet.vercel.app",
+    url: "https://komiknet.site",
     title: "KomikNet - Baca Komik Online",
     description: "Baca ribuan komik, manga, manhwa, dan manhua terlengkap dan terbaru.",
     siteName: "KomikNet",
@@ -48,7 +49,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <Script 
+          src="https://app.sandbox.midtrans.com/snap/snap.js" 
+          data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+          strategy="beforeInteractive" 
+        />
+        <DownloadAppModal />
+
+        {children}
+      </body>
     </html>
   );
 }

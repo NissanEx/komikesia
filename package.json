@@ -9,9 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "@supabase/supabase-js": "^2.118.0",
     "cheerio": "^1.2.0",
     "lucide-react": "^1.60.0",
+    "midtrans-client": "^1.4.3",
     "next": "16.4.2",
     "nyora-sdk": "^2.0.3",
     "react": "19.3.0",

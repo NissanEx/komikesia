@@ -7,6 +7,7 @@ import { getComickChapterPages } from "@/lib/comick";
 import { getKomikuChapterPages, getKomikuMangaDetail } from "@/lib/komiku";
 import ContinuousReader from "@/components/ContinuousReader";
 import AutoNext from "@/components/AutoNext";
+import AdBanner from "@/components/AdBanner"; // Import AdBanner
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string; chapterId: string }> }
@@ -49,7 +50,6 @@ async function ReaderContent({
   const { id, chapterId } = await params;
   const { source, mangaUrl } = await searchParams;
 
-  // PERBAIKAN FATAL: Decode ID terlebih dahulu!
   let decodedId = id;
   try { decodedId = decodeURIComponent(id); } catch(e) {}
 
@@ -63,26 +63,21 @@ async function ReaderContent({
     let finalChapterUrl = decodeUrlSafe(chapterId);
 
     try {
-      // 1. Ambil Gambar
       if (source === "komiku") { 
         images = await getKomikuChapterPages(finalChapterUrl);
       } else {
         images = await getComickChapterPages(finalChapterUrl, source);
       }
 
-      // 2. Cari Chapter Selanjutnya (Khusus Komiku)
-      // Gunakan decodedId yang sudah di-decode
       if (source === "komiku" && decodedId.startsWith("komiku:")) {
         const komikuMangaUrl = decodedId.replace("komiku:", "");
         const mangaDetail = await getKomikuMangaDetail(komikuMangaUrl);
 
         if (mangaDetail && mangaDetail.chapters && mangaDetail.chapters.length > 0) {
-          // Urutkan chapter
           const sortedChapters = [...mangaDetail.chapters].sort(
             (a, b) => (parseFloat(a.chapter) || 0) - (parseFloat(b.chapter) || 0)
           );
 
-          // Normalisasi URL untuk pencocokan
           const normalizeUrl = (u: string) => u.replace(/\/$/, "").toLowerCase();
           const targetUrl = normalizeUrl(finalChapterUrl);
 
@@ -90,7 +85,6 @@ async function ReaderContent({
             (c) => normalizeUrl(c.id) === targetUrl
           );
 
-          // Cadangan 1: Cocokkan berdasarkan angka chapter di URL
           if (currentIndex === -1) {
             const match = finalChapterUrl.match(/(?:chapter|ch)-(\d+(\.\d+)?)/i);
             if (match) {
@@ -99,13 +93,11 @@ async function ReaderContent({
             }
           }
 
-          // Jika ketemu, ambil chapter selanjutnya
           if (currentIndex !== -1 && currentIndex < sortedChapters.length - 1) {
             nextChapterId = encodeURIComponent(sortedChapters[currentIndex + 1].id);
           }
 
         } else {
-          // Cadangan 2 (PAMUNGKAS): Jika scraper gagal ambil list, tambahkan +1 dari URL saat ini
           const match = finalChapterUrl.match(/chapter-(\d+(\.\d+)?)/);
           if (match) {
             const currentNum = parseFloat(match[1]);
@@ -125,18 +117,27 @@ async function ReaderContent({
 
     return (
       <main className="max-w-3xl mx-auto px-0 md:px-4 py-0 md:py-8 flex flex-col items-center">
+        
+        {/* IKLAN DITARUH DI SINI (Akan muncul setiap kali halaman chapter dibuka) */}
+        <div className="w-full px-4 md:px-0 mb-4">
+          <AdBanner 
+            imageUrl="https://placehold.co/728x90/1a1a1a/ffffff?text=Dukung+Komik+Network,+Bebas+Iklan+dengan+Premium" 
+            linkUrl="/subscription"
+            label="SPONSOR"
+            isInternal={true}
+          />
+        </div>
+
         {images.map((imgUrl: string, index: number) => (
           <img 
             key={index} 
             src={`/api/image?url=${encodeURIComponent(imgUrl)}`} 
             alt={`Halaman ${index + 1}`}
-            // PERBAIKAN: Hapus mb-1 md:mb-2, tambahkan block
             className="w-full max-w-full h-auto block bg-white" 
             loading="lazy"
           />
         ))}
         
-        {/* TAMPILKAN AUTO NEXT JIKA ADA */}
         {nextChapterId ? (
           <AutoNext 
             nextChapterId={nextChapterId} 
@@ -216,10 +217,22 @@ async function ReaderContent({
     nextChapterId
   };
 
-  return <ContinuousReader initialData={initialData} mangaId={id} />;
+  return (
+    <div className="w-full">
+      {/* IKLAN UNTUK MANGADEX (Ditaruh di atas sebelum ContinuousReader) */}
+      <div className="max-w-3xl mx-auto pt-4 px-4 md:px-0">
+        <AdBanner 
+          imageUrl="https://placehold.co/728x90/1a1a1a/ffffff?text=Dukung+Komik+Network,+Bebas+Iklan+dengan+Premium" 
+          linkUrl="/subscription"
+          label="SPONSOR"
+          isInternal={true}
+        />
+      </div>
+      <ContinuousReader initialData={initialData} mangaId={id} />
+    </div>
+  );
 }
 
-// Helper untuk jaga-jaga
 function komikuMangaUrlFallback(decodedId: string) {
   try {
     return decodedId.replace("komiku:", "");
@@ -228,9 +241,6 @@ function komikuMangaUrlFallback(decodedId: string) {
   }
 }
 
-// ==========================================
-// Komponen Error & Halaman Utama
-// ==========================================
 function ErrorState({ id, message }: { id: string, message: string }) {
   let decodedId = id;
   try { decodedId = decodeURIComponent(id); } catch(e) {}
