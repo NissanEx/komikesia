@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, Loader2, Database } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Loader2, Database, Tags } from "lucide-react";
 
 type ComicItem = {
   id: string;
@@ -29,6 +29,7 @@ export default function ComicGrid({
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [activeSort, setActiveSort] = useState("Populer");
   const [activeSource, setActiveSource] = useState("Semua");
+  const [activeGenre, setActiveGenre] = useState("Semua"); // <-- STATE GENRE BARU
   const [currentPage, setCurrentPage] = useState(1);
   
   const [comics, setComics] = useState<ComicItem[]>(initialComics.slice(0, ITEMS_PER_PAGE));
@@ -37,11 +38,17 @@ export default function ComicGrid({
 
   const topGridRef = useRef<HTMLDivElement>(null);
   
-  // 1. REF UNTUK MENCEGAH DOUBLE FETCH SAAT PERTAMA KALI RENDER
+  // Ref untuk mencegah double fetch saat pertama kali render
   const isFirstRender = useRef(true);
 
   const categories = ["Semua", "Manga", "Manhwa", "Manhua"];
   const sources = ["Semua", "MangaDex", "Komiku", "AniList"];
+  
+  // DAFTAR GENRE
+  const genres = [
+    "Semua", "Action", "Romance", "Isekai", "Murim", 
+    "School Life", "Fantasy", "Comedy", "Horror", "Mystery"
+  ];
   
   const normalizeType = (type: string | undefined | null) => {
     if (!type) return "Manga";
@@ -63,7 +70,7 @@ export default function ComicGrid({
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   useEffect(() => {
-    // 2. JIKA INI RENDER PERTAMA, LEWATI FETCH (Gunakan data dari Server)
+    // Jika ini render pertama, lewati fetch (Gunakan data dari Server Component)
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
@@ -72,7 +79,8 @@ export default function ComicGrid({
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        let url = `/api/comics?page=${currentPage}&limit=${ITEMS_PER_PAGE}&category=${activeCategory}&sort=${activeSort}&source=${activeSource}&t=${Date.now()}`;
+        // Tambahkan parameter &genre= ke dalam URL API
+        let url = `/api/comics?page=${currentPage}&limit=${ITEMS_PER_PAGE}&category=${activeCategory}&sort=${activeSort}&source=${activeSource}&genre=${activeGenre}&t=${Date.now()}`;
         if (initialQuery) {
           url += `&q=${encodeURIComponent(initialQuery)}`;
         }
@@ -95,12 +103,13 @@ export default function ComicGrid({
     };
 
     fetchData();
-  }, [currentPage, activeCategory, activeSort, activeSource, initialQuery]);
+  }, [currentPage, activeCategory, activeSort, activeSource, activeGenre, initialQuery]); // Tambahkan activeGenre
 
-  const handleFilterChange = (type: "category" | "sort" | "source", value: string) => {
+  const handleFilterChange = (type: "category" | "sort" | "source" | "genre", value: string) => {
     if (type === "category") setActiveCategory(value);
     if (type === "sort") setActiveSort(value);
     if (type === "source") setActiveSource(value);
+    if (type === "genre") setActiveGenre(value);
     setCurrentPage(1); 
   };
 
@@ -115,8 +124,10 @@ export default function ComicGrid({
 
   return (
     <div className="w-full relative" ref={topGridRef}>
-      {/* HEADER: KATEGORI, SUMBER, & SORTIR */}
+      {/* HEADER: KATEGORI, SUMBER, GENRE, & SORTIR */}
       <div className="flex flex-row items-center justify-between gap-2 mb-8 border-b-2 border-gray-900 pb-4">
+        
+        {/* Kategori (Kiri) */}
         <div className="flex flex-row items-center gap-1 md:gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           {categories.map((category) => (
             <button
@@ -134,7 +145,10 @@ export default function ComicGrid({
           ))}
         </div>
 
+        {/* Filter Desktop (Kanan) */}
         <div className="hidden md:flex items-center gap-2 shrink-0">
+          
+          {/* Source Dropdown */}
           <Database className="w-4 h-4 text-gray-500" />
           <select
             value={activeSource}
@@ -147,6 +161,20 @@ export default function ComicGrid({
             ))}
           </select>
 
+          {/* Genre Dropdown */}
+          <Tags className="w-4 h-4 text-gray-500 ml-2" />
+          <select
+            value={activeGenre}
+            onChange={(e) => handleFilterChange("genre", e.target.value)}
+            disabled={isLoading}
+            className="bg-white border-2 border-gray-900 text-gray-900 font-mono text-xs font-bold uppercase tracking-widest px-3 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-amber-500"
+          >
+            {genres.map((genre) => (
+              <option key={genre} value={genre}>{genre}</option>
+            ))}
+          </select>
+
+          {/* Sort Dropdown */}
           <SlidersHorizontal className="w-4 h-4 text-gray-500 ml-2" />
           <select
             value={activeSort}
@@ -160,7 +188,9 @@ export default function ComicGrid({
           </select>
         </div>
 
+        {/* Filter Mobile (Kanan) */}
         <div className="flex md:hidden items-center gap-2 shrink-0">
+          {/* Mobile Source */}
           <div className="relative">
             <select
               value={activeSource}
@@ -177,6 +207,24 @@ export default function ComicGrid({
             </div>
           </div>
 
+          {/* Mobile Genre */}
+          <div className="relative">
+            <select
+              value={activeGenre}
+              onChange={(e) => handleFilterChange("genre", e.target.value)}
+              disabled={isLoading}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            >
+              {genres.map((genre) => (
+                <option key={genre} value={genre}>{genre}</option>
+              ))}
+            </select>
+            <div className={`w-8 h-8 flex items-center justify-center border-2 border-gray-900 shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-colors ${activeGenre !== "Semua" ? "bg-green-400" : "bg-white"} ${isLoading ? "opacity-50" : ""}`}>
+              <Tags className="w-4 h-4 text-gray-900" />
+            </div>
+          </div>
+
+          {/* Mobile Sort */}
           <div className="relative">
             <select
               value={activeSort}
@@ -259,7 +307,7 @@ export default function ComicGrid({
         ) : (
           <div className="w-full py-20 text-center border-2 border-dashed border-gray-300 bg-white">
             <p className="text-gray-500 font-mono text-sm uppercase tracking-widest">
-              Tidak ada komik untuk sumber <strong>{activeSource}</strong>.
+              Tidak ada komik untuk sumber <strong>{activeSource}</strong> dengan genre <strong>{activeGenre}</strong>.
             </p>
           </div>
         )}
@@ -271,6 +319,7 @@ export default function ComicGrid({
           <p className="font-mono text-sm text-gray-600 font-bold uppercase tracking-widest">
             Menampilkan {uniqueComics.length} dari <strong>{totalItems}</strong> komik 
             {activeSource !== "Semua" ? ` (${activeSource})` : ""}
+            {activeGenre !== "Semua" ? ` [${activeGenre}]` : ""}
           </p>
 
           <div className="flex items-center gap-2">

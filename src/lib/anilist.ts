@@ -138,14 +138,22 @@ export async function getAnilistMangaById(id: number): Promise<AnilistManga | nu
   };
 }
 
-export async function getAnilistPopularManga(): Promise<any[]> {
+// ==========================================
+// FUNGSI POPULER DENGAN FILTER GENRE YANG DIPERBAIKI
+// ==========================================
+export async function getAnilistPopularManga(genre: string = "Semua"): Promise<any[]> {
+  
+  // PERBAIKAN: Jadikan genre sebagai array [String] atau null (jika "Semua")
+  const genreVariable = genre !== "Semua" ? [genre] : null;
+
   const fetchByCountry = async (countryCode: string | null) => {
     const gqlQuery = `
-      query ($country: CountryCode) {
+      query ($country: CountryCode, $genre: [String]) {
         Page(page: 1, perPage: 50) {
           media(
             type: MANGA, 
             countryOfOrigin: $country,
+            genre_in: $genre, 
             sort: POPULARITY_DESC,
             format_in: [MANGA, NOVEL, ONE_SHOT]
           ) {
@@ -159,7 +167,7 @@ export async function getAnilistPopularManga(): Promise<any[]> {
         }
       }
     `;
-    const data = await fetchAnilist(gqlQuery, { country: countryCode });
+    const data = await fetchAnilist(gqlQuery, { country: countryCode, genre: genreVariable });
     return data?.Page?.media || [];
   };
 

@@ -5,7 +5,6 @@ import { getAnilistPopularManga, getAnilistMangaBySearch } from "@/lib/anilist";
 
 export const dynamic = 'force-dynamic';
 
-// Fungsi untuk menyortir data secara global
 function sortData(data: any[], sort: string) {
   const sorted = [...data];
   if (sort === "Rating") {
@@ -13,13 +12,11 @@ function sortData(data: any[], sort: string) {
   } else if (sort === "A-Z") {
     sorted.sort((a, b) => a.title.localeCompare(b.title));
   } else {
-    // Populer -> Sort berdasarkan popularity (jika ada), atau biarkan
     sorted.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   }
   return sorted;
 }
 
-// Fungsi untuk menghapus duplikat berdasarkan ID
 function deduplicate(data: any[]) {
   const seen = new Set();
   return data.filter((item) => {
@@ -37,14 +34,13 @@ export async function GET(req: NextRequest) {
   const sort = searchParams.get("sort") || "Populer";
   const source = searchParams.get("source") || "Semua";
   const query = searchParams.get("q") || "";
+  const genre = searchParams.get("genre") || "Semua";
 
   const noCacheHeaders = { 'Cache-Control': 'no-store, max-age=0, must-revalidate' };
 
   try {
-    // ==========================================
-    // 1. LOGIKA PENCARIAN (Query)
-    // ==========================================
     if (query) {
+      // ... (Logika Search tetap sama)
       const searchResults = await Promise.allSettled([
         getMangaBySearch(query),
         searchKomiku(query),
@@ -80,7 +76,6 @@ export async function GET(req: NextRequest) {
         combined.push(...aniData);
       }
 
-      // Filter & Sort
       if (category !== "Semua") {
         combined = combined.filter((c) => {
           const t = (c.type || "Manga").toLowerCase();
@@ -102,20 +97,20 @@ export async function GET(req: NextRequest) {
     }
 
     // ==========================================
-    // 2. LOGIKA SUMBER TUNGGAL
+    // LOGIKA SUMBER TUNGGAL (PENTING UNTUK MANGADEX)
     // ==========================================
     if (source === "MangaDex") {
-      const result = await getMangaByCategory(category, sort, page, limit);
+      const result = await getMangaByCategory(category, sort, page, limit, genre);
       return NextResponse.json({ data: result.data, total: result.total }, { headers: noCacheHeaders });
     }
 
     if (source === "Komiku") {
-      const result = await getKomikuPopularManga(page, limit, category);
+      const result = await getKomikuPopularManga(page, limit, category, genre);
       return NextResponse.json({ data: sortData(result.data, sort), total: result.total }, { headers: noCacheHeaders });
     }
 
     if (source === "AniList") {
-      const raw = await getAnilistPopularManga();
+      const raw = await getAnilistPopularManga(genre);
       let mappedAni = raw.map((c: any) => ({
         ...c,
         rating: c.averageScore || 0,
@@ -130,18 +125,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: sorted.slice(offset, offset + limit), total: sorted.length }, { headers: noCacheHeaders });
     }
 
-const fetchLimit = Math.min(page * limit + 20, 2000); 
+    // ==========================================
+    // SEMUA SUMBER (GABUNGAN)
+    // ==========================================
+    const fetchLimit = Math.min(page * limit + 20, 2000); 
+    
     const results = await Promise.allSettled([
-      getMangaByCategory(category, sort, 1, fetchLimit), // Ambil dari halaman 1 sebanyak fetchLimit
-      getAnilistPopularManga(),
-      getKomikuPopularManga(1, fetchLimit, category) // Ambil dari halaman 1 sebanyak fetchLimit
+      getMangaByCategory(category, sort, 1, fetchLimit, genre), 
+      getAnilistPopularManga(genre),
+      getKomikuPopularManga(1, fetchLimit, category, genre) 
     ]);
 
     const mdxRes = results[0].status === "fulfilled" ? results[0].value : { data: [], total: 0 };
     const aniRes = results[1].status === "fulfilled" ? results[1].value : [];
     const komikuRes = results[2].status === "fulfilled" ? results[2].value : { data: [], total: 0 };
 
-    // Map AniList
     const aniMapped = aniRes.map((c: any) => ({
       ...c,
       rating: c.averageScore || 0,
@@ -149,14 +147,12 @@ const fetchLimit = Math.min(page * limit + 20, 2000);
       readers: c.popularity ? c.popularity.toLocaleString() : "AniList"
     }));
 
-    // Gabungkan semua data mentah
     let combinedRaw = [
       ...mdxRes.data,
       ...aniMapped,
       ...komikuRes.data
     ];
 
-    // Filter Kategori
     if (category !== "Semua") {
       combinedRaw = combinedRaw.filter((c) => {
         const t = (c.type || "Manga").toLowerCase();
@@ -167,13 +163,9 @@ const fetchLimit = Math.min(page * limit + 20, 2000);
       });
     }
 
-    // 1. Hapus Duplikat
     let combinedClean = deduplicate(combinedRaw);
-
-    // 2. Sort secara GLOBAL
     let combinedSorted = sortData(combinedClean, sort);
 
-    // 3. Paginasi (Ambil sesuai halaman)
     const offset = (page - 1) * limit;
     const paginatedData = combinedSorted.slice(offset, offset + limit);
 

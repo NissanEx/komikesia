@@ -11,6 +11,21 @@ export interface ComicCard {
   source: "mangadex";
 }
 
+// ============================================
+// GENRE TAG IDs (MangaDex UUIDs)
+// ============================================
+const GENRE_TAGS: Record<string, string> = {
+  "Action": "391b0423-d847-456f-aff0-8b0cfc03066b",
+  "Romance": "423e2eae-a7a2-4a8b-ac03-a8351462d71d",
+  "Isekai": "ace04997-f6bd-436e-b261-779182193d3d",
+  "Murim": "799c202e-7daa-44eb-9cf7-8a3c0441531e", 
+  "School Life": "caaa44eb-cd40-4177-b930-79d3ef2afe87",
+  "Fantasy": "cdc58593-87dd-415e-bbc0-2ec27bf3405e",
+  "Comedy": "4d32cc48-9f00-4cca-9b5a-a839f0764984",
+  "Horror": "cdad7e68-1419-41dd-bdce-27753074a640",
+  "Mystery": "ee968100-4191-4968-93d3-f82d72be7e46",
+};
+
 const lastGood = new Map<string, string>();
 
 async function fetchWithTimeout(
@@ -143,7 +158,6 @@ async function fetchPopularByLang(langs: string[], limit: number) {
   return { data: json.data as any[], total: json.total as number };
 }
 
-// FUNGSI YANG HILANG SUDAH DITAMBAHKAN DI SINI
 async function fetchLatestChapterNumber(id: string) {
   try {
     const res = await fetchWithTimeout(`${BASE}/manga/${id}/aggregate`, { next: { revalidate: 86400 } });
@@ -229,39 +243,67 @@ export async function getPopularManga() {
   return safe(fetchPopularCached, { data: [], total: 0 }, "mengambil data populer");
 }
 
+// ============================================
+// 3. Fungsi Utama (Kategori, Sort, & Genre)
+// ============================================
 export async function getMangaByCategory(
   category: string = "Semua",
   sort: string = "Populer",
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
+  genre: string = "Semua" 
 ) {
   const offset = (page - 1) * limit;
   
-  let langQuery = "";
-  if (category === "Manga") langQuery = "originalLanguage[]=ja";
-  else if (category === "Manhwa") langQuery = "originalLanguage[]=ko";
-  else if (category === "Manhua") langQuery = "originalLanguage[]=zh&originalLanguage[]=zh-hk";
+  // Gunakan URLSearchParams untuk memastikan encoding yang aman untuk array []
+  const params = new URLSearchParams();
+  params.append("limit", limit.toString());
+  params.append("offset", offset.toString());
+  params.append("includes[]", "cover_art");
+  
+  // Sort
+  if (sort === "A-Z") params.append("order[title]", "asc");
+  else if (sort === "Rating") params.append("order[rating]", "desc");
+  else params.append("order[followedCount]", "desc");
+  
+  // Content Rating
+  params.append("contentRating[]", "safe");
+  params.append("contentRating[]", "suggestive");
+  
+  // Kategori Bahasa
+  if (category === "Manga") params.append("originalLanguage[]", "ja");
+  else if (category === "Manhwa") params.append("originalLanguage[]", "ko");
+  else if (category === "Manhua") {
+    params.append("originalLanguage[]", "zh");
+    params.append("originalLanguage[]", "zh-hk");
+  }
 
-  let orderQuery = "order[followedCount]=desc";
-  if (sort === "A-Z") orderQuery = "order[title]=asc";
-  else if (sort === "Rating") orderQuery = "order[rating]=desc";
+  // Filter Genre
+  if (genre !== "Semua" && GENRE_TAGS[genre]) {
+    params.append("includedTags[]", GENRE_TAGS[genre]);
+  }
 
-  const url = `${BASE}/manga?limit=${limit}&offset=${offset}&includes[]=cover_art&${orderQuery}&contentRating[]=safe&contentRating[]=suggestive&${langQuery}`;
+  const url = `${BASE}/manga?${params.toString()}`;
   
   try {
+    // Log untuk Debugging
+    console.log(`[MANGADEX] Fetch: ${category} | ${sort} | Genre: ${genre}`);
+
     const res = await fetchWithTimeout(url, { next: { revalidate: 3600 } });
     const json = await res.json();
     const list = json.data || [];
     
-    // AMBIL STATISTIK (FOLLOWERS & RATING)
+    // Ambil Statistik (Rating & Followers)
     let stats: Record<string, any> = {};
     try {
-      const ids = list.map((m: any) => `manga[]=${m.id}`).join("&");
-      const sres = await fetchWithTimeout(`${BASE}/statistics/manga?${ids}`);
-      if (sres.ok) stats = (await sres.json()).statistics ?? {};
+      if (list.length > 0) {
+        const ids = list.map((m: any) => `manga[]=${m.id}`).join("&");
+        const sres = await fetchWithTimeout(`${BASE}/statistics/manga?${ids}`);
+        if (sres.ok) stats = (await sres.json()).statistics ?? {};
+      }
     } catch {}
 
-    // FORMAT DATA
+    // Format Data
     const formattedData = list.map((manga: any) => {
       const s = stats[manga.id];
       return {
@@ -278,9 +320,11 @@ export async function getMangaByCategory(
 
     return { data: formattedData, total: json.total || 0 };
   } catch (e) {
+    console.error("[MANGADEX] Gagal fetch kategori:", e);
     return { data: [], total: 0 };
   }
 }
+
 // ============================================
 // 4. Pencarian, Gambar, Chapter Terbaru, dll
 // ============================================

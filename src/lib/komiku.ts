@@ -4,6 +4,19 @@ const KOMIKU_BASE = "https://komiku.org";
 const KOMIKU_API = "https://api.komiku.org";
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+// Mapping Slug Genre yang valid di Komiku
+const GENRE_SLUGS: Record<string, string> = {
+  "Action": "action",
+  "Romance": "romance", 
+  "Isekai": "isekai",
+  "Murim": "martial-arts", 
+  "School Life": "school-life",
+  "Fantasy": "fantasy",
+  "Comedy": "comedy",
+  "Horror": "horror",
+  "Mystery": "mystery"
+};
+
 async function fetchHtml(url: string): Promise<string> {
   try {
     const res = await fetch(url, {
@@ -14,7 +27,7 @@ async function fetchHtml(url: string): Promise<string> {
         "Referer": KOMIKU_BASE, 
         "X-Requested-With": "XMLHttpRequest",
       },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(10000),
     });
     if (res.ok) return await res.text();
   } catch (error) {
@@ -56,26 +69,18 @@ function parseKomikuPage(html: string): any[] {
       
       title = title.replace(/^(Sampul|Cover)\s+/i, '').replace(/\s+/g, ' ').trim();
 
-      // ==========================================
-      // EKSTRAKSI CHAPTER DARI URL TERBARU (AKURAT)
-      // ==========================================
       let chapterNumber = "?";
-      
-      // Cari link chapter terbaru di dalam kartu komik
       const chapterLink = container.find('a[href*="chapter-"], a[href*="ch-"]').last();
       if (chapterLink.length > 0) {
         const chapterHref = chapterLink.attr('href') || "";
-        // Ekstrak angka dari URL (contoh: ".../chapter-65/" -> "65")
         const matchUrl = chapterHref.match(/(?:chapter|ch)-(\d+(\.\d+)?)/i);
         if (matchUrl) {
           chapterNumber = matchUrl[1];
         } else {
-          // Fallback ke teks link jika URL aneh
           const textMatch = chapterLink.text().match(/(\d+(\.\d+)?)/);
           if (textMatch) chapterNumber = textMatch[1];
         }
       } else {
-        // Fallback ke elemen text biasa
         const chapterText = container.find('.up, .newch, .chapter').text();
         const matchText = chapterText.match(/(\d+(\.\d+)?)/);
         if (matchText) chapterNumber = matchText[0];
@@ -111,32 +116,53 @@ function parseKomikuPage(html: string): any[] {
 
   return comics;
 }
-// lib/komiku.ts
 
-export async function getKomikuPopularManga(page: number = 1, limit: number = 20, category: string = "Semua"): Promise<{ data: any[], total: number }> {
+// ==========================================
+// FUNGSI POPULER + GENRE (TANPA FILTER KATA KUNCI)
+// ==========================================
+export async function getKomikuPopularManga(
+  page: number = 1, 
+  limit: number = 20, 
+  category: string = "Semua",
+  genre: string = "Semua"
+): Promise<{ data: any[], total: number }> {
   try {
     let allComics: any[] = [];
     
-    // TARIK BANYAK HALAMAN: Kita tarik 100 halaman sekaligus untuk mendapatkan SELURUH data.
-    // 100 halaman kira-kira berisi 1000-1500 judul komik mentah.
-    const pagesToFetch = 100; 
-    
-    // Buat array promise untuk fetch 100 halaman secara bersamaan
-    const fetchPromises = Array.from({ length: pagesToFetch }, (_, i) => 
-      fetchHtml(`${KOMIKU_API}/manga/page/${i + 1}/`)
+    let baseUrl = `${KOMIKU_API}/manga`;
+    if (genre !== "Semua" && GENRE_SLUGS[genre]) {
+      // Tembak langsung endpoint genre API Komiku
+      baseUrl = `${KOMIKU_API}/genre/${GENRE_SLUGS[genre]}`;
+    }
+
+    // Tarik 10 halaman (sekitar 100 komik per genre)
+    const pagesToFetch = 10; 
+    const urlsToFetch = Array.from({ length: pagesToFetch }, (_, i) => 
+      `${baseUrl}/page/${i + 1}/`
     );
 
-    // Eksekusi semua fetch secara paralel (cepat)
+    const fetchPromises = urlsToFetch.map(url => fetchHtml(url));
     const htmlResults = await Promise.all(fetchPromises);
     
-    // Gabungkan semua hasil HTML
     htmlResults.forEach(html => {
       if (html) {
         allComics = [...allComics, ...parseKomikuPage(html)];
       }
     });
 
-    // Filter berdasarkan Kategori (Manhua/Manhwa/Manga)
+    // Jika API Genre gagal/kosong, coba Web Utama
+    if (allComics.length === 0 && genre !== "Semua") {
+      const webBaseUrl = `${KOMIKU_BASE}/genre/${GENRE_SLUGS[genre]}`;
+      const webUrls = Array.from({ length: pagesToFetch }, (_, i) => 
+        i === 0 ? `${webBaseUrl}/` : `${webBaseUrl}/page/${i + 1}/`
+      );
+      const webHtmls = await Promise.all(webUrls.map(url => fetchHtml(url)));
+      webHtmls.forEach(html => {
+        if (html) allComics = [...allComics, ...parseKomikuPage(html)];
+      });
+    }
+
+    // Filter Kategori (Manga/Manhwa/Manhua)
     if (category !== "Semua") {
       allComics = allComics.filter((c) => c.type.toLowerCase() === category.toLowerCase());
     }
@@ -149,11 +175,10 @@ export async function getKomikuPopularManga(page: number = 1, limit: number = 20
       return true;
     });
 
-    // Paginasi (potong data sesuai halaman yang diminta, misal 20 per halaman)
+    // Paginasi manual
     const offset = (page - 1) * limit;
     const paginatedData = uniqueComics.slice(offset, offset + limit);
 
-    // Kembalikan data halaman ini, dan total keseluruhan komik yang berhasil ditarik
     return { data: paginatedData, total: uniqueComics.length };
   } catch (error) {
     console.error("[KOMIKU] Gagal ambil populer:", error);
@@ -161,6 +186,9 @@ export async function getKomikuPopularManga(page: number = 1, limit: number = 20
   }
 }
 
+// ==========================================
+// FUNGSI DETAIL MANGA
+// ==========================================
 export async function getKomikuMangaDetail(url: string) {
   try {
     const html = await fetchHtml(url);
@@ -188,6 +216,9 @@ export async function getKomikuMangaDetail(url: string) {
   }
 }
 
+// ==========================================
+// FUNGSI GAMBAR CHAPTER
+// ==========================================
 export async function getKomikuChapterPages(url: string): Promise<string[]> {
   try {
     if (!url.startsWith("http")) return [];
@@ -217,6 +248,9 @@ export async function getKomikuChapterPages(url: string): Promise<string[]> {
   }
 }
 
+// ==========================================
+// FUNGSI PENCARIAN (SEARCH)
+// ==========================================
 export async function searchKomiku(query: string): Promise<any[]> {
   try {
     let allResults: any[] = [];
