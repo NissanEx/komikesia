@@ -8,10 +8,13 @@ export default function DownloadAppModal() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    // Cek apakah user sudah pernah melihat iklan ini
-    const hasSeen = localStorage.getItem("hasSeenAppPromo");
-    
-    if (!hasSeen) {
+    // Kita gunakan key baru untuk menyimpan waktu (timestamp)
+    const lastSeen = localStorage.getItem("lastAppPromoTime");
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000; // 1 jam dalam milidetik (3.600.000 ms)
+
+    // Jika belum pernah lihat ATAU sudah lewat 1 jam
+    if (!lastSeen || now - Number(lastSeen) > oneHour) {
       // Tampilkan setelah 2 detik agar website sempat loading dulu
       const timer = setTimeout(() => {
         setIsOpen(true);
@@ -22,8 +25,8 @@ export default function DownloadAppModal() {
 
   const handleClose = () => {
     setIsOpen(false);
-    // Simpan status agar tidak muncul lagi
-    localStorage.setItem("hasSeenAppPromo", "true");
+    // Simpan timestamp saat ini ke localStorage
+    localStorage.setItem("lastAppPromoTime", Date.now().toString());
   };
 
   if (!isOpen) return null;

@@ -1,10 +1,9 @@
 import { Suspense, cache } from "react";
-import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import ComicGrid from "@/components/ComicGrid";
 import NewsFeed from "@/components/NewsFeed";
 import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
+// HAPUS IMPORT FOOTER DARI SINI
 import FeaturedSlider from "@/components/FeaturedSlider";
 import { getPopularManga } from "@/lib/mangadex"; 
 import { getAnilistPopularManga } from "@/lib/anilist";
@@ -78,8 +77,6 @@ async function FeaturedServer() {
   const { mdxRes, aniRes, komikuRes } = await getHomepageData();
   const combined = [...mdxRes.data, ...aniRes, ...komikuRes.data];
   
-  // PERBAIKAN: Menghapus Math.random() untuk mencegah Hydration Error.
-  // Kita gunakan irisan tetap, atau bisa gunakan fungsi shuffle berbasis ID jika ingin benar-benar acak.
   const sliced = combined.slice(5, 15);
   
   return <FeaturedSlider comics={sliced} />;
@@ -160,20 +157,17 @@ function SliderSkeleton() {
   );
 }
 
-// ==========================================
-// MAIN PAGE
-// ==========================================
+
+
 export default function Home() {
   return (
-    // PERBAIKAN: Menggunakan flex flex-col min-h-screen
-    <div className="min-h-screen flex flex-col bg-[#f4f4f4] font-sans text-gray-900 selection:bg-amber-500 selection:text-white">
-      <Header />
-
+    <div className="w-full flex-grow flex flex-col bg-[#f4f4f4] font-sans text-gray-900 selection:bg-amber-500 selection:text-white">
+      
       <Suspense fallback={<HeroSkeleton />}>
         <HeroServer />
       </Suspense>
 
-      {/* PERBAIKAN: Menambahkan flex-grow agar mendorong footer ke paling bawah */}
+      {/* Pastikan tidak ada mb-12 atau margin bawah yang besar di sini */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-4 py-10 flex flex-col lg:grid lg:grid-cols-12 gap-10">
         <div className="w-full lg:col-span-8 flex flex-col gap-12">
           <Suspense fallback={<ComicSkeleton />}>
@@ -192,12 +186,10 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Slider Rekomendasi (Di Atas Footer) */}
       <Suspense fallback={<SliderSkeleton />}>
         <FeaturedServer />
       </Suspense>
 
-      <Footer />
     </div>
   );
 }

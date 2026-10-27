@@ -5,7 +5,7 @@ import { getMangaBySearch } from "@/lib/mangadex";
 import { searchKomiku } from "@/lib/komiku";
 import { getAnilistMangaBySearch } from "@/lib/anilist";
 import ComicGrid from "@/components/ComicGrid";
-import Header from "@/components/Header";
+// HAPUS: import Header from "@/components/Header";
 
 async function SearchHeader({ searchParamsPromise }: { searchParamsPromise: Promise<{ q?: string }> }) {
   const { q } = await searchParamsPromise;
@@ -56,24 +56,24 @@ async function SearchResults({ searchParamsPromise }: { searchParamsPromise: Pro
   const komikuData = (searchResults[1].status === "fulfilled" ? searchResults[1].value : []).map((c: any) => ({ ...c, source: "komiku" }));
   combined.push(...komikuData);
 
-  // 3. AniList
-  const aniRaw = searchResults[2].status === "fulfilled" ? searchResults[2].value : [];
-  const aniData = aniRaw.map((c: any) => {
-    let type = "Manga";
-    if (c.countryOfOrigin === "KR") type = "Manhwa";
-    else if (c.countryOfOrigin === "CN" || c.countryOfOrigin === "TW") type = "Manhua";
-    
-    return {
-      id: `anilist:${c.id}`,
-      title: c.title,
-      type: type,
-      img: c.coverImage,
-      rating: c.averageScore || 0,
-      readers: "AniList",
-      chapters: c.chapters ? String(c.chapters) : "?",
-      source: "anilist"
-    };
-  });
+ // Cari bagian ini di dalam fungsi SearchResults:
+const aniRaw = searchResults[2].status === "fulfilled" ? searchResults[2].value : [];
+const aniData = aniRaw.map((c: any) => {
+  let type = "Manga";
+  if (c.countryOfOrigin === "KR") type = "Manhwa";
+  else if (c.countryOfOrigin === "CN" || c.countryOfOrigin === "TW") type = "Manhua";
+  
+  return {
+    id: `anilist:${c.id}`,
+    title: c.title,
+    type: type,
+    img: c.coverImage || "https://placehold.co/400x600/png?text=No+Image", // <-- PERBAIKAN: Pastikan property 'img' berisi string URL gambar
+    rating: c.averageScore || 0,
+    readers: "AniList",
+    chapters: c.chapters ? String(c.chapters) : "?",
+    source: "anilist"
+  };
+});
   combined.push(...aniData);
 
   // Hapus duplikat
@@ -112,8 +112,10 @@ export default function SearchPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   return (
-    <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans pb-0 selection:bg-amber-500 selection:text-white">
-      <Header />
+    // REVISI: Hapus min-h-screen, gunakan w-full flex-grow
+    <div className="w-full flex-grow bg-[#f4f4f4] text-gray-900 font-sans pb-12 selection:bg-amber-500 selection:text-white">
+      {/* HAPUS: <Header /> */}
+      
       <main className="max-w-7xl mx-auto px-4 pt-12">
         <Suspense fallback={
           <div className="mb-10 border-b-2 border-gray-900 pb-6">

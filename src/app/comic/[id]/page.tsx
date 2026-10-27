@@ -10,12 +10,10 @@ import {
   getMangaBySearch,
 } from "@/lib/mangadex";
 import type { Metadata } from "next";
-import { getComickChapters } from "@/lib/comick";
 import { getKomikuMangaDetail } from "@/lib/komiku";
 import { getAnilistMangaById } from "@/lib/anilist";
 import ChapterList from "@/components/ChapterList";
 import BookmarkButton from "@/components/BookmarkButton";
-import Header from "@/components/Header"; 
 
 type ChapterItem = {
   id: string;
@@ -39,12 +37,18 @@ function countLanguages(chapters: ChapterItem[]) {
   return languages;
 }
 
+// REVISI: Memperbaiki parser agar kebal terhadap ID ganda (anilist:anilist:123)
 function parseAnilistId(id: string): number | null {
   try {
     const decoded = decodeURIComponent(id);
-    if (!decoded.startsWith("anilist:") && !decoded.startsWith("anilist-")) return null;
-    const raw = decoded.replace(/^anilist[:-]/, "");
-    const n = Number(raw);
+    // Jika tidak mengandung kata "anilist", bukan rute AniList
+    if (!decoded.toLowerCase().includes("anilist")) return null;
+    
+    // Ekstrak angka pertama yang ditemukan dalam string
+    const match = decoded.match(/\d+/);
+    if (!match) return null;
+    
+    const n = Number(match[0]);
     return Number.isFinite(n) && n > 0 ? n : null;
   } catch {
     return null;
@@ -62,7 +66,7 @@ function ComicInfo({ manga }: { manga: any }) {
   const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
   const coverUrl = coverArt?.attributes?.fileName
     ? `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`
-    : "https://komiknet.site/default-cover.jpg"; // Domain diperbarui
+    : "https://komiknet.site/default-cover.jpg";
 
   const tags = manga.attributes.tags.slice(0, 3).map((t: any) => t.attributes.name.en).join(" · ");
 
@@ -254,33 +258,30 @@ function KomikuComicInfo({ manga }: { manga: any }) {
 // ==========================================
 // 2. Daftar Chapter
 // ==========================================
-async function ComicChapters({ id, titles, lastChapter }: { id: string; titles: string[]; lastChapter: string | null; }) {
+async function ComicChapters({ id }: { id: string }) {
   await connection();
 
   let finalChapters: ChapterItem[] = [];
   let finalLanguages: Record<string, number> = {};
-  let isFallback = false;
-  let usedSourceName = "";
 
-  try {
-    const comickData = await getComickChapters(titles); 
-    if (comickData && comickData.chapters.length > 0) {
-      isFallback = true;
-      usedSourceName = comickData.chapters[0].source || "Comick";
-      finalChapters = comickData.chapters.map((c: any) => ({
-        id: c.id, attributes: { chapter: c.chapter, title: c.title, publishAt: c.publishAt, translatedLanguage: "en", nyoraSource: comickData.sourceId, nyoraMangaUrl: comickData.mangaUrl, sourceName: usedSourceName }
-      }));
-    }
-  } catch (err) {}
-
-  if (finalChapters.length === 0 && id !== "unknown" && id !== "") {
+  if (id !== "unknown" && id !== "") {
     try {
       const chaptersData = await getMangaChapters(id);
       finalChapters = (chaptersData?.data ?? []).map((c: any) => ({
-        id: c.id, attributes: { chapter: c.attributes.chapter ?? null, title: c.attributes.title ?? null, publishAt: c.attributes.publishAt ?? null, translatedLanguage: c.attributes.translatedLanguage || "en", nyoraSource: null, nyoraMangaUrl: null, sourceName: "MangaDex" }
+        id: c.id, 
+        attributes: { 
+          chapter: c.attributes.chapter ?? null, 
+          title: c.attributes.title ?? null, 
+          publishAt: c.attributes.publishAt ?? null, 
+          translatedLanguage: c.attributes.translatedLanguage || "en", 
+          nyoraSource: null, 
+          nyoraMangaUrl: null, 
+          sourceName: "MangaDex" 
+        }
       }));
-      usedSourceName = "MangaDex";
-    } catch (err) {}
+    } catch (err) {
+      console.error("Gagal mengambil chapter MangaDex:", err);
+    }
   }
 
   finalChapters.sort((a, b) => (parseFloat(b.attributes.chapter || "0") || 0) - (parseFloat(a.attributes.chapter || "0") || 0));
@@ -292,13 +293,6 @@ async function ComicChapters({ id, titles, lastChapter }: { id: string; titles: 
         <h2 className="text-3xl font-black uppercase tracking-tighter">Indeks Chapter</h2>
         <span className="font-mono text-sm bg-gray-900 text-white px-3 py-1">TOTAL: {finalChapters.length}</span>
       </div>
-
-      {isFallback && (
-        <div className="bg-white border-l-4 border-amber-500 p-4 mb-6 flex items-start gap-3 shadow-sm">
-          <span className="text-lg">ℹ️</span>
-          <p className="text-gray-800 font-medium text-sm">Daftar chapter diambil dari sumber alternatif (<strong>{usedSourceName}</strong>).</p>
-        </div>
-      )}
 
       {finalChapters.length === 0 ? (
         <div className="text-center py-12 border border-dashed border-gray-400 bg-gray-100">
@@ -346,13 +340,12 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
     };
 
     let matchId = "unknown";
-    let matchTitle = manga.title;
     try {
       const results = await getMangaBySearch(manga.title);
       const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
       const target = norm(manga.title);
       const candidate = results.find((r) => norm(r.title) === target) || results.find((r) => norm(r.title).includes(target)) || results[0];
-      if (candidate) { matchId = candidate.id; matchTitle = candidate.title; }
+      if (candidate) { matchId = candidate.id; }
     } catch (err) {}
 
     return (
@@ -363,7 +356,7 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
         />
         <AnilistComicInfo manga={manga} />
         <Suspense fallback={<LoadingState />}>
-          <ComicChapters id={matchId} titles={[matchTitle, manga.title]} lastChapter={null} />
+          <ComicChapters id={matchId} />
         </Suspense>
       </>
     );
@@ -417,9 +410,6 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
   if (!mangaData?.data) return <ErrorState msg="Data MangaDex Terputus" />;
 
   const manga = mangaData.data;
-  const titles = getTitleCandidates(manga);
-  const lastChapter = manga.attributes.lastChapter || null;
-
   const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
   const coverUrl = coverArt?.attributes?.fileName
     ? `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`
@@ -442,7 +432,7 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
       />
       <ComicInfo manga={manga} />
       <Suspense fallback={<LoadingState />}>
-        <ComicChapters id={id} titles={titles} lastChapter={lastChapter} />
+        <ComicChapters id={id} />
       </Suspense>
     </>
   );
@@ -474,7 +464,7 @@ export async function generateMetadata(
 
   let title = "Baca Komik";
   let description = "Baca komik terlengkap hanya di KomikNet.";
-  let image = "https://komiknet.site/default-cover.jpg"; // Domain diperbarui
+  let image = "https://komiknet.site/default-cover.jpg";
 
   try {
     if (decodedId.startsWith("komiku:")) {
@@ -485,8 +475,8 @@ export async function generateMetadata(
         description = `Baca komik ${manga.title} online gratis. ${cleanDesc.slice(0, 150)}...`;
         image = manga.img;
       }
-    } else if (decodedId.startsWith("anilist:")) {
-      const anilistId = Number(decodedId.replace("anilist:", ""));
+    } else if (parseAnilistId(decodedId) !== null) {
+      const anilistId = parseAnilistId(decodedId)!;
       const manga = await getAnilistMangaById(anilistId);
       if (manga) {
         title = `Baca ${manga.title} Bahasa Indonesia`;
@@ -544,8 +534,7 @@ export async function generateMetadata(
 // ==========================================
 export default function ComicDetailPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <div className="min-h-screen bg-[#f4f4f4] text-gray-900 font-sans selection:bg-amber-500 selection:text-white pb-20">
-      <Header />
+    <div className="w-full flex-grow bg-[#f4f4f4] text-gray-900 font-sans selection:bg-amber-500 selection:text-white pb-20">
       <main className="max-w-6xl mx-auto px-4 pt-12">
         <Suspense fallback={<LoadingState />}>
           <ComicDetailsWrapper params={params} />

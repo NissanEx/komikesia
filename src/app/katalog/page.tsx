@@ -1,17 +1,13 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import ComicGrid from "@/components/ComicGrid";
 import { getPopularManga } from "@/lib/mangadex";
+// HAPUS: import Header from "@/components/Header";
+// HAPUS: import Footer from "@/components/Footer";
 
 async function CatalogContent() {
   await connection(); 
-  
-  // Ambil data awal
   const mangadexRes = await getPopularManga();
-  
-  // Kirim ke Grid beserta totalnya
   return <ComicGrid initialComics={mangadexRes.data} total={mangadexRes.total} />;
 }
 
@@ -33,12 +29,9 @@ function CatalogSkeleton() {
 
 export default function CatalogPage() {
   return (
-    // REVISI: Menambahkan flex flex-col
-    <div className="min-h-screen flex flex-col bg-[#f4f4f4] font-sans text-gray-900 selection:bg-amber-500 selection:text-white">
-      <Header />
+    <div className="w-full flex-grow">
       
-      {/* REVISI: Menambahkan flex-grow w-full */}
-      <main className="flex-grow w-full max-w-7xl mx-auto px-4 py-12">
+      <main className="w-full max-w-7xl mx-auto px-4 py-12">
         <div className="mb-8">
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
             Katalog
@@ -49,7 +42,7 @@ export default function CatalogPage() {
         </Suspense>
       </main>
       
-      <Footer />
+      {/* HAPUS: <Footer /> */}
     </div>
   );
 }

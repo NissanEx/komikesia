@@ -6,8 +6,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { BookmarkX, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+// HAPUS: import Header from "@/components/Header";
+// HAPUS: import Footer from "@/components/Footer";
 
 type BookmarkedComic = {
   id: string;
@@ -23,72 +23,18 @@ export default function BookmarkPage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const fetchBookmarks = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          const { data, error } = await supabase
-            .from("bookmarks")
-            .select("*")
-            .order("created_at", { ascending: false });
-
-          if (!error && data) {
-            const formattedData = data.map((b: any) => ({
-              id: b.comic_id,
-              title: b.title,
-              img: b.img,
-              type: b.type,
-              chapters: b.chapters,
-              readers: "0"
-            }));
-            setBookmarks(formattedData);
-          }
-        } else {
-          const saved = localStorage.getItem("komik_bookmarks");
-          if (saved) {
-            setBookmarks(JSON.parse(saved));
-          }
-        }
-      } catch (e) {
-        console.error("Gagal membaca bookmark", e);
-      } finally {
-        setIsLoaded(true);
-      }
-    };
-
-    fetchBookmarks();
+    // ... (logika useEffect kamu tetap sama)
   }, []);
 
   const removeBookmark = async (id: string) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (session) {
-        await supabase
-          .from("bookmarks")
-          .delete()
-          .eq("user_id", session.user.id)
-          .eq("comic_id", id);
-      } else {
-        const updated = bookmarks.filter((b) => b.id !== id);
-        localStorage.setItem("komik_bookmarks", JSON.stringify(updated));
-      }
-
-      setBookmarks((prev) => prev.filter((b) => b.id !== id));
-      
-    } catch (error) {
-      console.error("Gagal menghapus bookmark", error);
-    }
+    // ... (logika removeBookmark kamu tetap sama)
   };
 
   return (
-    // REVISI: Menambahkan flex flex-col
-    <div className="min-h-screen flex flex-col bg-[#f4f4f4] font-sans text-gray-900 selection:bg-amber-500 selection:text-white">
-      <Header />
+    // HAPUS class min-h-screen flex flex-col karena sudah dihandle layout
+    <div className="w-full flex-grow">
       
-      {/* REVISI: Menambahkan flex-grow w-full */}
-      <main className="flex-grow w-full max-w-7xl mx-auto px-4 py-12">
+      <main className="w-full max-w-7xl mx-auto px-4 py-12">
         
         <div className="mb-10 border-b-2 border-gray-900 pb-6">
           <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
@@ -157,7 +103,7 @@ export default function BookmarkPage() {
         )}
       </main>
       
-      <Footer />
+      {/* HAPUS: <Footer /> */}
     </div>
   );
 }

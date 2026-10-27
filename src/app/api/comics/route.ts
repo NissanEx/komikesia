@@ -3,7 +3,12 @@ import { getMangaByCategory, getMangaBySearch } from "@/lib/mangadex";
 import { getKomikuPopularManga, searchKomiku } from "@/lib/komiku";
 import { getAnilistPopularManga, getAnilistMangaBySearch } from "@/lib/anilist";
 
-export const dynamic = 'force-dynamic';
+// ISR 5 menit — jangan force-dynamic
+export const revalidate = 300;
+
+const CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+};
 
 function sortData(data: any[], sort: string) {
   const sorted = [...data];
@@ -26,156 +31,172 @@ function deduplicate(data: any[]) {
   });
 }
 
+function filterCategory(data: any[], category: string) {
+  if (category === "Semua") return data;
+  return data.filter((c) => {
+    const t = (c.type || "Manga").toLowerCase();
+    if (category === "Manhwa" && (t.includes("manhwa") || t.includes("korea") || t.includes("kr") || t.includes("webtoon"))) return true;
+    if (category === "Manhua" && (t.includes("manhua") || t.includes("china") || t.includes("cn"))) return true;
+    if (category === "Manga" && !t.includes("manhwa") && !t.includes("manhua") && !t.includes("korea") && !t.includes("china")) return true;
+    return false;
+  });
+}
+
+function mapAniList(raw: any[]) {
+  return (raw || []).map((c: any) => {
+    let type = "Manga";
+    if (c.countryOfOrigin === "KR") type = "Manhwa";
+    else if (c.countryOfOrigin === "CN" || c.countryOfOrigin === "TW") type = "Manhua";
+    
+    return {
+      id: `anilist:${c.id}`,
+      title: c.title,
+      type,
+      // PERBAIKAN: Gunakan c.img (untuk katalog) ATAU c.coverImage (untuk search)
+      img: c.img || c.coverImage || "https://placehold.co/400x600/png?text=No+Image",
+      rating: c.averageScore || 0,
+      popularity: c.popularity || 0,
+      readers: c.popularity ? c.popularity.toLocaleString() : "AniList",
+      chapters: c.chapters ? String(c.chapters) : "?",
+      source: "anilist",
+    };
+  });
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const page = Number(searchParams.get("page")) || 1;
-  const limit = Number(searchParams.get("limit")) || 20;
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 20));
   const category = searchParams.get("category") || "Semua";
   const sort = searchParams.get("sort") || "Populer";
   const source = searchParams.get("source") || "Semua";
   const query = searchParams.get("q") || "";
   const genre = searchParams.get("genre") || "Semua";
 
-  const noCacheHeaders = { 'Cache-Control': 'no-store, max-age=0, must-revalidate' };
+  const t0 = Date.now();
 
   try {
+    // ==========================================
+    // SEARCH
+    // ==========================================
     if (query) {
-      // ... (Logika Search tetap sama)
-      const searchResults = await Promise.allSettled([
+      const [mdx, komiku, ani] = await Promise.allSettled([
         getMangaBySearch(query),
         searchKomiku(query),
-        getAnilistMangaBySearch(query)
+        getAnilistMangaBySearch(query),
       ]);
 
       let combined: any[] = [];
 
       if (source === "Semua" || source === "MangaDex") {
-        combined.push(...(searchResults[0].status === "fulfilled" ? searchResults[0].value : []).map((c: any) => ({ ...c, source: "mangadex" })));
+        if (mdx.status === "fulfilled") {
+          combined.push(...mdx.value.map((c: any) => ({ ...c, source: "mangadex" })));
+        }
       }
       if (source === "Semua" || source === "Komiku") {
-        combined.push(...(searchResults[1].status === "fulfilled" ? searchResults[1].value : []).map((c: any) => ({ ...c, source: "komiku" })));
+        if (komiku.status === "fulfilled") {
+          combined.push(...komiku.value.map((c: any) => ({ ...c, source: "komiku" })));
+        }
       }
       if (source === "Semua" || source === "AniList") {
-        const aniRaw = searchResults[2].status === "fulfilled" ? searchResults[2].value : [];
-        const aniData = aniRaw.map((c: any) => {
-          let type = "Manga";
-          if (c.countryOfOrigin === "KR") type = "Manhwa";
-          else if (c.countryOfOrigin === "CN" || c.countryOfOrigin === "TW") type = "Manhua";
-          return {
-            id: `anilist:${c.id}`,
-            title: c.title,
-            type: type,
-            img: c.coverImage,
-            rating: c.averageScore || 0,
-            popularity: c.popularity || 0,
-            readers: c.popularity ? c.popularity.toLocaleString() : "AniList", 
-            chapters: c.chapters ? String(c.chapters) : "?",
-            source: "anilist"
-          };
-        });
-        combined.push(...aniData);
+        if (ani.status === "fulfilled") combined.push(...mapAniList(ani.value));
       }
 
-      if (category !== "Semua") {
-        combined = combined.filter((c) => {
-          const t = (c.type || "Manga").toLowerCase();
-          if (category === "Manhwa" && (t.includes("manhwa") || t.includes("korea") || t.includes("kr") || t.includes("webtoon"))) return true;
-          if (category === "Manhua" && (t.includes("manhua") || t.includes("china") || t.includes("cn"))) return true;
-          if (category === "Manga" && !t.includes("manhwa") && !t.includes("manhua") && !t.includes("korea") && !t.includes("china")) return true;
-          return false;
-        });
-      }
-
+      combined = filterCategory(combined, category);
       combined = deduplicate(combined);
       combined = sortData(combined, sort);
 
       const offset = (page - 1) * limit;
-      return NextResponse.json({
-        data: combined.slice(offset, offset + limit),
-        total: combined.length
-      }, { headers: noCacheHeaders });
+      console.log(`[API/search] ${query} | ${Date.now() - t0}ms`);
+      return NextResponse.json(
+        { data: combined.slice(offset, offset + limit), total: combined.length },
+        { headers: CACHE_HEADERS }
+      );
     }
 
     // ==========================================
-    // LOGIKA SUMBER TUNGGAL (PENTING UNTUK MANGADEX)
+    // SUMBER TUNGGAL
     // ==========================================
     if (source === "MangaDex") {
       const result = await getMangaByCategory(category, sort, page, limit, genre);
-      return NextResponse.json({ data: result.data, total: result.total }, { headers: noCacheHeaders });
+      console.log(`[API/mangadex] ${category}|${sort}|${genre}|p${page} | ${Date.now() - t0}ms`);
+      return NextResponse.json(
+        { data: result.data, total: result.total },
+        { headers: CACHE_HEADERS }
+      );
     }
 
     if (source === "Komiku") {
       const result = await getKomikuPopularManga(page, limit, category, genre);
-      return NextResponse.json({ data: sortData(result.data, sort), total: result.total }, { headers: noCacheHeaders });
+      console.log(`[API/komiku] p${page} | ${Date.now() - t0}ms`);
+      return NextResponse.json(
+        { data: sortData(result.data, sort), total: result.total },
+        { headers: CACHE_HEADERS }
+      );
     }
 
     if (source === "AniList") {
       const raw = await getAnilistPopularManga(genre);
-      let mappedAni = raw.map((c: any) => ({
-        ...c,
-        rating: c.averageScore || 0,
-        popularity: c.popularity || 0,
-        readers: c.popularity ? c.popularity.toLocaleString() : "AniList"
-      }));
-
-      const filtered = category === "Semua" ? mappedAni : mappedAni.filter((c: any) => c.type === category);
+      const mapped = mapAniList(raw);
+      const filtered = filterCategory(mapped, category);
       const sorted = sortData(filtered, sort);
-      
+
       const offset = (page - 1) * limit;
-      return NextResponse.json({ data: sorted.slice(offset, offset + limit), total: sorted.length }, { headers: noCacheHeaders });
+      console.log(`[API/anilist] p${page} | ${Date.now() - t0}ms`);
+      return NextResponse.json(
+        { data: sorted.slice(offset, offset + limit), total: sorted.length },
+        { headers: CACHE_HEADERS }
+      );
     }
 
     // ==========================================
     // SEMUA SUMBER (GABUNGAN)
     // ==========================================
-    const fetchLimit = Math.min(page * limit + 20, 2000); 
-    
-    const results = await Promise.allSettled([
-      getMangaByCategory(category, sort, 1, fetchLimit, genre), 
+    // Ambil window tetap, JANGAN page * limit.
+    // Untuk merge + dedupe + sort, cukup ~4x limit.
+    const window = Math.min(limit * 4, 120);
+
+    const [mdxS, aniS, komikuS] = await Promise.allSettled([
+      getMangaByCategory(category, sort, 1, window, genre),
       getAnilistPopularManga(genre),
-      getKomikuPopularManga(1, fetchLimit, category, genre) 
+      getKomikuPopularManga(1, window, category, genre),
     ]);
 
-    const mdxRes = results[0].status === "fulfilled" ? results[0].value : { data: [], total: 0 };
-    const aniRes = results[1].status === "fulfilled" ? results[1].value : [];
-    const komikuRes = results[2].status === "fulfilled" ? results[2].value : { data: [], total: 0 };
+    const mdxRes = mdxS.status === "fulfilled" ? mdxS.value : { data: [], total: 0 };
+    const aniRes = aniS.status === "fulfilled" ? aniS.value : [];
+    const komikuRes = komikuS.status === "fulfilled" ? komikuS.value : { data: [], total: 0 };
 
-    const aniMapped = aniRes.map((c: any) => ({
-      ...c,
-      rating: c.averageScore || 0,
-      popularity: c.popularity || 0,
-      readers: c.popularity ? c.popularity.toLocaleString() : "AniList"
-    }));
-
-    let combinedRaw = [
+    let combined = [
       ...mdxRes.data,
-      ...aniMapped,
-      ...komikuRes.data
+      ...mapAniList(aniRes),
+      ...komikuRes.data,
     ];
 
-    if (category !== "Semua") {
-      combinedRaw = combinedRaw.filter((c) => {
-        const t = (c.type || "Manga").toLowerCase();
-        if (category === "Manhwa" && (t.includes("manhwa") || t.includes("korea") || t.includes("kr") || t.includes("webtoon"))) return true;
-        if (category === "Manhua" && (t.includes("manhua") || t.includes("china") || t.includes("cn"))) return true;
-        if (category === "Manga" && !t.includes("manhwa") && !t.includes("manhua") && !t.includes("korea") && !t.includes("china")) return true;
-        return false;
-      });
-    }
-
-    let combinedClean = deduplicate(combinedRaw);
-    let combinedSorted = sortData(combinedClean, sort);
+    combined = filterCategory(combined, category);
+    combined = deduplicate(combined);
+    combined = sortData(combined, sort);
 
     const offset = (page - 1) * limit;
-    const paginatedData = combinedSorted.slice(offset, offset + limit);
+    const paginated = combined.slice(offset, offset + limit);
 
-    return NextResponse.json({ 
-      data: paginatedData, 
-      total: mdxRes.total + aniRes.length + komikuRes.total 
-    }, { headers: noCacheHeaders });
+    console.log(
+      `[API/all] ${category}|${sort}|${genre}|p${page} | ` +
+      `mdx=${mdxRes.data.length} ani=${aniRes.length} kmk=${komikuRes.data.length} | ` +
+      `${Date.now() - t0}ms`
+    );
 
+    return NextResponse.json(
+      {
+        data: paginated,
+        total: mdxRes.total + aniRes.length + komikuRes.total,
+      },
+      { headers: CACHE_HEADERS }
+    );
   } catch (error) {
-    console.error("[API COMICS ERROR]", error);
-    return NextResponse.json({ data: [], total: 0 }, { status: 200, headers: noCacheHeaders }); 
+    console.error("[API COMICS ERROR]", (error as Error).message);
+    return NextResponse.json(
+      { data: [], total: 0 },
+      { status: 200, headers: CACHE_HEADERS }
+    );
   }
 }

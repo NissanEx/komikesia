@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useMemo } from "react";
-import Link from "next/link"; // Tambahkan import Link
+import Link from "next/link";
 import { ArrowUp } from "lucide-react";
 
 const WORDS = [
-  "COMIC", "NETWORK", "BACA", "MANGA", "MANHWA", "MANHUA", "UPDATE", "NEW",
+  "KOMIK", "NETWORK", "BACA", "MANGA", "MANHWA", "MANHUA", "UPDATE", "NEW",
   "CHAPTER", "RANK", "TOP", "HOT", "RAW", "EP", "VOL", "END", "LOAD",
   "PAGE", "READ", "TEXT", "X", "0", "1", "7", ".", ":", "·",
 ];
 
-const DIAGONAL_WORDS = ["COMIC NETWORK", "BACA KOMIK", "MANGA", "CHAPTER BARU", "MANHWA"];
+const DIAGONAL_WORDS = ["KOMIK NETWORK", "BACA KOMIK", "MANGA", "CHAPTER BARU", "MANHWA"];
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -84,7 +84,8 @@ export default function Footer() {
   }, []);
 
   return (
-    <div className="relative">
+    // REVISI: Menambahkan bg-[#f4f4f4] agar area yang terpotong clip-path menyesuaikan warna background utama
+    <div className="relative bg-[#f4f4f4]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10">
         {specks.map((s, i) => (
           <span
@@ -96,7 +97,7 @@ export default function Footer() {
       </div>
       
       <footer
-        className="relative overflow-hidden bg-[#0a0a0a] font-mono text-[#eeede8]"
+        className="relative overflow-hidden bg-[#0a0a0a] font-mono text-[#f4f4f4]"
         style={{ clipPath: clip }}
       >
         <div
@@ -113,7 +114,8 @@ export default function Footer() {
             {diagonals.map((d, i) => (
               <span
                 key={i}
-                className="absolute origin-top-left whitespace-nowrap bg-[#eeede8] px-1 font-bold uppercase leading-none text-[#0a0a0a]"
+                // REVISI: bg diubah ke #f4f4f4
+                className="absolute origin-top-left whitespace-nowrap bg-[#f4f4f4] px-1 font-bold uppercase leading-none text-[#0a0a0a]"
                 style={{
                   left: `${d.left}%`,
                   top: d.top,
@@ -132,8 +134,8 @@ export default function Footer() {
                 key={i}
                 className={`absolute whitespace-nowrap text-[10px] uppercase leading-[12px] tracking-wider ${
                   t.solid
-                    ? "bg-[#eeede8] px-[3px] font-bold text-[#0a0a0a]"
-                    : "text-[#eeede8]/45"
+                    ? "bg-[#f4f4f4] px-[3px] font-bold text-[#0a0a0a]" // REVISI: bg diubah ke #f4f4f4
+                    : "text-[#f4f4f4]/45" // REVISI: text color diubah
                 }`}
                 style={{ left: `${t.left}%`, top: t.top + 20 }}
               >
@@ -151,43 +153,43 @@ export default function Footer() {
                   className="h-10 w-10 shrink-0"
                   style={{
                     backgroundImage:
-                      "repeating-linear-gradient(135deg, #eeede8 0 1.5px, transparent 1.5px 4px)",
+                      "repeating-linear-gradient(135deg, #f4f4f4 0 1.5px, transparent 1.5px 4px)", // REVISI: warna diubah
                     clipPath: "polygon(0 0, 100% 0, 100% 78%, 78% 100%, 0 100%)",
                   }}
                 />
                 <h2 className="text-[19px] font-medium uppercase leading-[1.15] tracking-wide">
-                  Comic
+                  Komik
                   <br />
                   Network
                 </h2>
               </div>
 
-              <p className="mt-8 max-w-lg font-sans text-[14px] leading-relaxed text-[#eeede8]/65">
-                Comic Network adalah platform baca komik online terbaik yang menyediakan ribuan manga, manhwa, dan manhua dengan update chapter terbaru setiap hari. Nikmati pengalaman membaca tanpa batas dengan antarmuka yang cepat dan nyaman.
+              <p className="mt-8 max-w-lg font-sans text-[14px] leading-relaxed text-[#f4f4f4]/65">
+                Komik Network adalah platform baca komik online terbaik yang menyediakan ribuan manga, manhwa, dan manhua dengan update chapter terbaru setiap hari. Nikmati pengalaman membaca tanpa batas dengan antarmuka yang cepat dan nyaman.
               </p>
             </div>
           </div>
 
           {/* ====== BOTTOM BAR ====== */}
-          <div className="relative mt-20 border-t border-[#eeede8]/15 py-6">
+          <div className="relative mt-20 border-t border-[#f4f4f4]/15 py-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               
               {/* KIRI: Copyright & Legal Links */}
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-4 text-[10px] sm:text-[12px] uppercase tracking-wide text-[#eeede8]/60">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-4 text-[10px] sm:text-[12px] uppercase tracking-wide text-[#f4f4f4]/60">
                 <p className="whitespace-nowrap">
-                  © {new Date().getFullYear()} Comic Network
+                  © {new Date().getFullYear()} Komik Network
                 </p>
-                <span className="hidden sm:inline text-[#eeede8]/30">•</span>
+                <span className="hidden sm:inline text-[#f4f4f4]/30">•</span>
                 <Link 
                   href="/privacy" 
-                  className="hover:text-[#eeede8] hover:underline transition-colors whitespace-nowrap"
+                  className="hover:text-[#f4f4f4] hover:underline transition-colors whitespace-nowrap"
                 >
                   Privacy
                 </Link>
-                <span className="hidden sm:inline text-[#eeede8]/30">•</span>
+                <span className="hidden sm:inline text-[#f4f4f4]/30">•</span>
                 <Link 
                   href="/terms" 
-                  className="hover:text-[#eeede8] hover:underline transition-colors whitespace-nowrap"
+                  className="hover:text-[#f4f4f4] hover:underline transition-colors whitespace-nowrap"
                 >
                   Terms
                 </Link>
@@ -195,22 +197,22 @@ export default function Footer() {
 
               {/* KANAN: Built by & Tombol Panah */}
               <div className="flex flex-row items-center gap-3 sm:gap-6">
-                <p className="text-[10px] sm:text-[12px] uppercase tracking-wide text-[#eeede8]/60 whitespace-nowrap">
+                <p className="text-[10px] sm:text-[12px] uppercase tracking-wide text-[#f4f4f4]/60 whitespace-nowrap">
                   Built by{" "}
                   <a 
-                    href="https://www.instagram.com/p/DezUBh2OPgE/#" 
+                    href="https://web.facebook.com/profile.php?id=61595541045826" 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="text-[#eeede8] hover:underline hover:underline-offset-4 font-bold transition-colors"
+                    className="text-[#f4f4f4] hover:underline hover:underline-offset-4 font-bold transition-colors"
                   >
-                    SANDY W
+                    KOMIK NETWORK
                   </a>
                 </p>
                 
                 <button
                   onClick={scrollToTop}
                   aria-label="Kembali ke atas"
-                  className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-[3px] bg-[#eeede8]/10 text-[#eeede8] transition-colors hover:bg-[#eeede8]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+                  className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-[3px] bg-[#f4f4f4]/10 text-[#f4f4f4] transition-colors hover:bg-[#f4f4f4]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
                 >
                   <ArrowUp className="h-3 w-3 sm:h-4 sm:w-4" />
                 </button>

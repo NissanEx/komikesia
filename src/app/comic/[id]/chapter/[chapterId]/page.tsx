@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowLeft, ExternalLink, Loader2, AlertTriangle } from "lucide-react";
 import { getChapterImages, getMangaChapters } from "@/lib/mangadex";
-import { getComickChapterPages } from "@/lib/comick";
+// HAPUS: import { getComickChapterPages } from "@/lib/comick";
 import { getKomikuChapterPages, getKomikuMangaDetail } from "@/lib/komiku";
 import ContinuousReader from "@/components/ContinuousReader";
 import AutoNext from "@/components/AutoNext";
-import AdBanner from "@/components/AdBanner"; // Import AdBanner
+import AdBanner from "@/components/AdBanner"; 
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string; chapterId: string }> }
@@ -54,7 +54,7 @@ async function ReaderContent({
   try { decodedId = decodeURIComponent(id); } catch(e) {}
 
   // ==========================================
-  // LOGIKA SUMBER ALTERNATIF (Komiku, dll)
+  // LOGIKA SUMBER ALTERNATIF (Komiku)
   // ==========================================
   if (source) {
     let images: string[] = [];
@@ -63,10 +63,9 @@ async function ReaderContent({
     let finalChapterUrl = decodeUrlSafe(chapterId);
 
     try {
+      // REVISI: Hanya memanggil komiku, karena comick sudah dihapus
       if (source === "komiku") { 
         images = await getKomikuChapterPages(finalChapterUrl);
-      } else {
-        images = await getComickChapterPages(finalChapterUrl, source);
       }
 
       if (source === "komiku" && decodedId.startsWith("komiku:")) {
@@ -118,7 +117,6 @@ async function ReaderContent({
     return (
       <main className="max-w-3xl mx-auto px-0 md:px-4 py-0 md:py-8 flex flex-col items-center">
         
-        {/* IKLAN DITARUH DI SINI (Akan muncul setiap kali halaman chapter dibuka) */}
         <div className="w-full px-4 md:px-0 mb-4">
           <AdBanner 
             imageUrl="https://placehold.co/728x90/1a1a1a/ffffff?text=Dukung+Komik+Network,+Bebas+Iklan+dengan+Premium" 
@@ -219,7 +217,6 @@ async function ReaderContent({
 
   return (
     <div className="w-full">
-      {/* IKLAN UNTUK MANGADEX (Ditaruh di atas sebelum ContinuousReader) */}
       <div className="max-w-3xl mx-auto pt-4 px-4 md:px-0">
         <AdBanner 
           imageUrl="https://placehold.co/728x90/1a1a1a/ffffff?text=Dukung+Komik+Network,+Bebas+Iklan+dengan+Premium" 
@@ -257,19 +254,24 @@ function ErrorState({ id, message }: { id: string, message: string }) {
   );
 }
 
-export default function ChapterReaderPage({ 
+// REVISI: Menjadikan fungsi ini async agar bisa mengambil ID komik untuk tombol Back
+export default async function ChapterReaderPage({ 
   params,
   searchParams
 }: { 
   params: Promise<{ id: string; chapterId: string }>;
   searchParams: Promise<{ source?: string; mangaUrl?: string }>;
 }) {
+  const resolvedParams = await params;
+  const comicId = resolvedParams.id;
+
   return (
     <div className="min-h-screen bg-[#f4f4f4] pb-0 font-sans">
       <header className="bg-white border-b-2 border-gray-900 sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center text-gray-900 hover:text-amber-600 font-mono font-bold text-xs uppercase tracking-widest transition-colors">
-            <ArrowLeft className="w-4 h-4 mr-2" />Kembali
+          {/* REVISI: Link diarahkan ke /comic/${comicId} */}
+          <Link href={`/comic/${comicId}`} className="flex items-center text-gray-900 hover:text-amber-600 font-mono font-bold text-xs uppercase tracking-widest transition-colors">
+            <ArrowLeft className="w-4 h-4 mr-2" />Kembali ke Detail
           </Link>
         </div>
       </header>
