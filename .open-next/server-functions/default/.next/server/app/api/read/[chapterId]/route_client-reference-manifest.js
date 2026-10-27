@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/read/[chapterId]/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"/mnt/SteamSSD/komiksetya/src/app/api/read/[chapterId]/route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};
