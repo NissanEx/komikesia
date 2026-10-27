@@ -1,0 +1,8 @@
+[build]
+  command = "npm run build"
+  # PENTING: Untuk Next.js App Router (SSR), biarkan publish directory kosong atau ".netlify".
+  # Jangan isi dengan ".next" atau "out".
+  publish = ".netlify"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
