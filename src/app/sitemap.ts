@@ -3,98 +3,63 @@ import { getPopularManga } from '@/lib/mangadex'
 import { getAnilistPopularManga } from '@/lib/anilist'
 import { getKomikuPopularManga } from '@/lib/komiku'
 
-// Simpan di cache Vercel selama 1 jam agar Googlebot mendapat respons instan
-export const revalidate = 3600;
+// Jangan di-prerender saat build
+export const dynamic = 'force-dynamic'
 
-type SitemapEntry = MetadataRoute.Sitemap[number];
+type SitemapEntry = MetadataRoute.Sitemap[number]
 
-async function getAllComics() {
-  try {
-    // Ambil data secara paralel. 
-    // Batasi jumlahnya agar tidak memberatkan server saat Googlebot merayapi.
-    const [mdxRes, aniRes, komikuRes] = await Promise.allSettled([
-      getPopularManga(), 
-      getAnilistPopularManga(),
-      getKomikuPopularManga(1, 100, "Semua") // Batasi 100 komik dari Komiku
-    ]);
+// Batasi tiap sumber maksimal 8 detik, kalau lewat dianggap gagal
+function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), ms)
+    ),
+  ])
+}
 
-    const mdxData = mdxRes.status === "fulfilled" ? mdxRes.value.data : [];
-    const aniData = aniRes.status === "fulfilled" ? aniRes.value : [];
-    const komikuData = komikuRes.status === "fulfilled" ? komikuRes.value.data : [];
+async function getAllComics(): Promise<any[]> {
+  const [mdxRes, aniRes, komikuRes] = await Promise.allSettled([
+    withTimeout(getPopularManga()),
+    withTimeout(getAnilistPopularManga()),
+    withTimeout(getKomikuPopularManga(1, 100, 'Semua')),
+  ])
 
-    // Gabungkan dan hilangkan duplikat berdasarkan ID
-    const all = [...mdxData, ...aniData, ...komikuData];
-    const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
-    
-    return unique;
-  } catch (error) {
-    console.error("Gagal mengambil data untuk sitemap:", error);
-    return [];
-  }
+  const mdxData = mdxRes.status === 'fulfilled' ? mdxRes.value?.data ?? [] : []
+  const aniData = aniRes.status === 'fulfilled' ? aniRes.value ?? [] : []
+  const komikuData =
+    komikuRes.status === 'fulfilled' ? komikuRes.value?.data ?? [] : []
+
+  const all = [...mdxData, ...aniData, ...komikuData].filter(
+    (c: any) => c && c.id
+  )
+  return Array.from(new Map(all.map((c: any) => [c.id, c])).values())
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://komiknet.site';
-  
-  // 1. Halaman Statis Wajib
-  const staticRoutes: SitemapEntry[] = [
-    { 
-      url: baseUrl, 
-      lastModified: new Date(), 
-      changeFrequency: 'daily', 
-      priority: 1.0 
-    },
-    { 
-      url: `${baseUrl}/katalog`, 
-      lastModified: new Date(), 
-      changeFrequency: 'daily', 
-      priority: 0.9 
-    },
-    { 
-      url: `${baseUrl}/login`, 
-      lastModified: new Date(), 
-      changeFrequency: 'monthly', 
-      priority: 0.5 
-    },
-    { 
-      url: `${baseUrl}/register`, 
-      lastModified: new Date(), 
-      changeFrequency: 'monthly', 
-      priority: 0.5 
-    },
-    { 
-      url: `${baseUrl}/privacy`, 
-      lastModified: new Date(), 
-      changeFrequency: 'yearly', 
-      priority: 0.3 
-    },
-    { 
-      url: `${baseUrl}/terms`, 
-      lastModified: new Date(), 
-      changeFrequency: 'yearly', 
-      priority: 0.3 
-    },
-    { 
-      url: `${baseUrl}/download`, 
-      lastModified: new Date(), 
-      changeFrequency: 'monthly', 
-      priority: 0.6 
-    }
-  ];
+  const baseUrl = 'https://komiknet.site'
+  const now = new Date()
 
-  // 2. Halaman Dinamis (Komik)
-  const comics = await getAllComics();
-  
-  const comicRoutes: SitemapEntry[] = comics
-    .filter((comic: any) => comic && comic.id) // Pastikan ID tidak kosong
-    .map((comic: any) => ({
-      // Encode ID untuk mengantisipasi karakter aneh seperti / atau :
+  const staticRoutes: SitemapEntry[] = [
+    { url: baseUrl, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
+    { url: `${baseUrl}/katalog`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${baseUrl}/download`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+  ]
+
+  let comicRoutes: SitemapEntry[] = []
+  try {
+    const comics = await getAllComics()
+    comicRoutes = comics.map((comic: any) => ({
       url: `${baseUrl}/comic/${encodeURIComponent(comic.id)}`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.8,
-    }));
+    }))
+  } catch (e) {
+    console.error('Gagal ambil data sitemap:', e)
+  }
 
-  // Gabungkan semua rute
-  return [...staticRoutes, ...comicRoutes];
+  return [...staticRoutes, ...comicRoutes]
 }

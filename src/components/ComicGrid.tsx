@@ -266,7 +266,7 @@ export default function ComicGrid({
               }
 
               return (
-                <Link href={`/comic/${comic.id}`} key={comic.id} className="group">
+               <Link href={`/comic/${encodeURIComponent(comic.id)}`} key={comic.id} className="group">
                   <div className="bg-white border-2 border-gray-900 flex flex-col h-full transition-all duration-300 group-hover:shadow-[6px_6px_0px_rgba(0,0,0,1)] group-hover:-translate-y-1 group-hover:-translate-x-1">
                     <div className="relative aspect-[3/4] overflow-hidden border-b-2 border-gray-900 bg-gray-100">
                       <img

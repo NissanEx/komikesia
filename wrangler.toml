@@ -1,13 +1,13 @@
 name = "komiknetwork"
 main = ".open-next/worker.js"
-compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 workers_dev = true
-preview_urls = true # <-- TAMBAHKAN BARIS INI
+preview_urls = true
 
 # =====================================================================
-# PENGATURAN OBSERVABILITY (Sesuai permintaan dashboard Cloudflare)
+# OBSERVABILITY
 # =====================================================================
 [observability]
 enabled = false
@@ -29,9 +29,10 @@ persist = true
 enabled = true
 
 # =====================================================================
-# (OPSIONAL) UNTUK DOMAIN KUSTOM (komiknet.site)
-# Hapus tanda pagar (#) di bawah ini JIKA domain komiknet.site 
-# sudah dimasukkan ke Cloudflare dan Nameserver-nya sudah aktif.
+# DOMAIN KUSTOM (komiknet.site)
+# Hapus tanda pagar (#) di bawah ini HANYA JIKA status komiknet.site di
+# Cloudflare sudah Active. Jangan dipakai bersamaan dengan Add Domain
+# lewat dashboard, pilih salah satu.
 # =====================================================================
 # routes = [
 #   { pattern = "komiknet.site", custom_domain = true },

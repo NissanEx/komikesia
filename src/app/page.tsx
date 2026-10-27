@@ -9,8 +9,6 @@ import { getPopularManga } from "@/lib/mangadex";
 import { getAnilistPopularManga } from "@/lib/anilist";
 import { getKomikuPopularManga } from "@/lib/komiku";
 
-export const dynamic = 'force-dynamic';
-
 const getCachedMangaDex = cache(getPopularManga);
 const getCachedAniList = cache(getAnilistPopularManga);
 const getCachedKomiku = cache(getKomikuPopularManga);

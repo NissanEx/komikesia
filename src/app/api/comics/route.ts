@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         data: paginated,
-        total: mdxRes.total + aniRes.length + komikuRes.total,
+        total: combined.length, // <-- GUNAKAN INI
       },
       { headers: CACHE_HEADERS }
     );

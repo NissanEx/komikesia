@@ -5,7 +5,6 @@ import { Plus, ArrowRight } from "lucide-react";
 import {
   getMangaById,
   getMangaChapters,
-  getTitleCandidates,
   pickTitle,
   getMangaBySearch,
 } from "@/lib/mangadex";
@@ -37,14 +36,18 @@ function countLanguages(chapters: ChapterItem[]) {
   return languages;
 }
 
-// REVISI: Memperbaiki parser agar kebal terhadap ID ganda (anilist:anilist:123)
+// Parser AniList yang sudah diperkuat dengan Double Decode
 function parseAnilistId(id: string): number | null {
   try {
-    const decoded = decodeURIComponent(id);
-    // Jika tidak mengandung kata "anilist", bukan rute AniList
+    let decoded = id;
+    try {
+      decoded = decodeURIComponent(decodeURIComponent(id));
+    } catch (e) {
+      try { decoded = decodeURIComponent(id); } catch (err) {}
+    }
+    
     if (!decoded.toLowerCase().includes("anilist")) return null;
     
-    // Ekstrak angka pertama yang ditemukan dalam string
     const match = decoded.match(/\d+/);
     if (!match) return null;
     
@@ -66,7 +69,7 @@ function ComicInfo({ manga }: { manga: any }) {
   const coverArt = manga.relationships.find((rel: any) => rel.type === "cover_art");
   const coverUrl = coverArt?.attributes?.fileName
     ? `https://uploads.mangadex.org/covers/${manga.id}/${coverArt.attributes.fileName}`
-    : "https://komiknet.site/default-cover.jpg";
+    : "https://komiknet.site/default-cover.jpg"; 
 
   const tags = manga.attributes.tags.slice(0, 3).map((t: any) => t.attributes.name.en).join(" · ");
 
@@ -307,9 +310,29 @@ async function ComicChapters({ id }: { id: string }) {
   );
 }
 
-// ==========================================
-// 3. Wrapper Params & JSON-LD (SEO)
-// ==========================================
+function safeDecode(str: string): string {
+  let decoded = str;
+  let prev = "";
+  let loops = 0;
+  
+  // Terus decode sampai tidak ada perubahan (max 5 kali)
+  while (decoded !== prev && loops < 5) {
+    prev = decoded;
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch (e) {
+      break;
+    }
+    loops++;
+  }
+  
+  // Bersihkan format komiku:// yang salah
+  if (decoded.startsWith("komiku://")) {
+    decoded = decoded.replace("komiku://", "komiku:https://");
+  }
+  
+  return decoded;
+}
 async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }> }) {
   let id = "";
   try {
@@ -319,8 +342,17 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
     return <ErrorState msg="ID Parameter tidak valid." />;
   }
 
-  let decodedId = id;
-  try { decodedId = decodeURIComponent(id); } catch (e) {}
+  // PERBAIKAN: DOUBLE DECODE
+  let decodedId = safeDecode(id);
+  try { 
+    decodedId = decodeURIComponent(decodeURIComponent(id)); 
+  } catch (e) {
+    try { decodedId = decodeURIComponent(id); } catch (err) {}
+  }
+
+  if (decodedId.startsWith("komiku://")) {
+    decodedId = decodedId.replace("komiku://", "komiku:https://");
+  }
 
   const anilistId = parseAnilistId(id);
 
@@ -328,7 +360,7 @@ async function ComicDetailsWrapper({ params }: { params: Promise<{ id: string }>
   if (anilistId !== null) {
     let manga = null;
     try { manga = await getAnilistMangaById(anilistId); } catch (e) {}
-    if (!manga) return <ErrorState msg="Data AniList Terputus" />;
+    if (!manga) return <ErrorState msg="Data AniList Terputus atau ID tidak ditemukan." />;
 
     const jsonLd = {
       "@context": "https://schema.org",
@@ -452,15 +484,22 @@ function ErrorState({ msg }: { msg: string }) {
   );
 }
 
-// ==========================================
-// 4. Metadata Dinamis (SEO Friendly)
-// ==========================================
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
   const { id } = await params;
+  
+  // PERBAIKAN: DOUBLE DECODE
   let decodedId = id;
-  try { decodedId = decodeURIComponent(id); } catch (e) {}
+  try { 
+    decodedId = decodeURIComponent(decodeURIComponent(id)); 
+  } catch (e) {
+    try { decodedId = decodeURIComponent(id); } catch (err) {}
+  }
+
+  if (decodedId.startsWith("komiku://")) {
+    decodedId = decodedId.replace("komiku://", "komiku:https://");
+  }
 
   let title = "Baca Komik";
   let description = "Baca komik terlengkap hanya di KomikNet.";

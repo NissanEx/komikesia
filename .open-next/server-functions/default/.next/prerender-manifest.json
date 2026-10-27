@@ -29,68 +29,11 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/_not-found": {
-      "initialStatus": 404,
-      "routeType": "page",
-      "response": "complete",
-      "compute": "static",
-      "htmlSize": 6556,
-      "experimentalBypassFor": [
-        {
-          "type": "header",
-          "key": "next-action"
-        },
-        {
-          "type": "header",
-          "key": "content-type",
-          "value": "multipart/form-data;.*"
-        }
-      ],
-      "initialRevalidateSeconds": false,
-      "srcRoute": "/_not-found",
-      "dataRoute": "/_not-found.rsc",
-      "allowHeader": [
-        "host",
-        "x-matched-path",
-        "x-prerender-revalidate",
-        "x-prerender-revalidate-if-generated",
-        "x-next-revalidated-tags",
-        "x-next-revalidate-tag-token"
-      ]
-    },
-    "/bookmark": {
-      "routeType": "page",
-      "response": "complete",
-      "compute": "static",
-      "htmlSize": 12591,
-      "experimentalBypassFor": [
-        {
-          "type": "header",
-          "key": "next-action"
-        },
-        {
-          "type": "header",
-          "key": "content-type",
-          "value": "multipart/form-data;.*"
-        }
-      ],
-      "initialRevalidateSeconds": false,
-      "srcRoute": "/bookmark",
-      "dataRoute": "/bookmark.rsc",
-      "allowHeader": [
-        "host",
-        "x-matched-path",
-        "x-prerender-revalidate",
-        "x-prerender-revalidate-if-generated",
-        "x-next-revalidated-tags",
-        "x-next-revalidate-tag-token"
-      ]
-    },
-    "/favicon.ico": {
+    "/icon.png": {
       "initialHeaders": {
         "cache-control": "public, max-age=0, must-revalidate",
-        "content-type": "image/x-icon",
-        "x-next-cache-tags": "_N_T_/layout,_N_T_/favicon.ico/layout,_N_T_/favicon.ico/route,_N_T_/favicon.ico"
+        "content-type": "image/png",
+        "x-next-cache-tags": "_N_T_/layout,_N_T_/icon.png/layout,_N_T_/icon.png/route,_N_T_/icon.png"
       },
       "routeType": "route",
       "response": "complete",
@@ -107,7 +50,7 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/favicon.ico",
+      "srcRoute": "/icon.png",
       "dataRoute": null,
       "allowHeader": [
         "host",
@@ -122,8 +65,8 @@
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "309da231b06d8c5d73a182d60c0890f1",
-    "previewModeSigningKey": "d1b9f59c2d3ffd98bb3191857fdaeb26b9c45a938af8b17b1d3cc52ef5dd751a",
-    "previewModeEncryptionKey": "04096db2f339186266f7e39aada44e73efb1eea7ee772540665bf2075baa0e00"
+    "previewModeId": "bb4a60ef2f96bcc0f5f820bcc32c5d82",
+    "previewModeSigningKey": "a08db3c884e8b80ccb599c5194b9129fed590d0cadc95a9ae7395ecc3d83217b",
+    "previewModeEncryptionKey": "d12a8411c0022de7852824efd062df5a353d47070de22f5664db6f6b864d93b2"
   }
 }

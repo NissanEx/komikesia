@@ -1,15 +1,25 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/_global-error/page": "app/_global-error/page.js",
+  "/api/checkout/route": "app/api/checkout/route.js",
   "/api/image/route": "app/api/image/route.js",
   "/api/read/[chapterId]/route": "app/api/read/[chapterId]/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/icon.png/route": "app/icon.png/route.js",
   "/api/comics/route": "app/api/comics/route.js",
   "/api/nyora-proxy/[...slug]/route": "app/api/nyora-proxy/[...slug]/route.js",
-  "/bookmark/page": "app/bookmark/page.js",
+  "/sitemap.xml/route": "app/sitemap.xml/route.js",
   "/comic/[id]/chapter/[chapterId]/page": "app/comic/[id]/chapter/[chapterId]/page.js",
   "/comic/[id]/page": "app/comic/[id]/page.js",
+  "/download/page": "app/download/page.js",
   "/katalog/page": "app/katalog/page.js",
+  "/login/page": "app/login/page.js",
   "/page": "app/page.js",
-  "/search/page": "app/search/page.js"
+  "/privacy/page": "app/privacy/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/register/page": "app/register/page.js",
+  "/search/page": "app/search/page.js",
+  "/subscription/page": "app/subscription/page.js",
+  "/terms/page": "app/terms/page.js",
+  "/update-password/page": "app/update-password/page.js",
+  "/bookmark/page": "app/bookmark/page.js"
 }

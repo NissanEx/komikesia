@@ -1,7 +1,6 @@
 // src/lib/anilist.ts
 
-const ANILIST_ENDPOINT = "https://graphql.anilist.co";
-
+const ANILIST_ENDPOINT = "https://anilist-proxy-alpha.vercel.app/api/anilist"; 
 export type AnilistManga = {
   id: number;
   title: string;
@@ -25,7 +24,12 @@ async function fetchAnilist(query: string, variables: Record<string, any>) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
+        "Accept": "application/json",
+        // --- TAMBAHKAN HEADER BROWSER DI BAWAH INI ---
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+        "Referer": "https://anilist.co/",
+        "Origin": "https://anilist.co",
       },
       body: JSON.stringify({ query, variables }),
       signal: AbortSignal.timeout(10000),
@@ -138,23 +142,21 @@ export async function getAnilistMangaById(id: number): Promise<AnilistManga | nu
   };
 }
 
-// ==========================================
-// FUNGSI POPULER DENGAN FILTER GENRE YANG DIPERBAIKI
-// ==========================================
 export async function getAnilistPopularManga(genre: string = "Semua"): Promise<any[]> {
-  
-  // PERBAIKAN: Jadikan genre sebagai array [String] atau null (jika "Semua")
-  const genreVariable = genre !== "Semua" ? [genre] : null;
-
   const fetchByCountry = async (countryCode: string | null) => {
+    // 1. Jika genre bukan "Semua", tambahkan filter genre_in
+    const genreQuery = genre !== "Semua" ? `, genre_in: $genre` : "";
+    const genreVariableDef = genre !== "Semua" ? `, $genre: [String]` : "";
+
+    // 2. Susun query GraphQL secara dinamis
     const gqlQuery = `
-      query ($country: CountryCode, $genre: [String]) {
+      query ($country: CountryCode ${genreVariableDef}) {
         Page(page: 1, perPage: 50) {
           media(
             type: MANGA, 
-            countryOfOrigin: $country,
-            genre_in: $genre, 
-            sort: POPULARITY_DESC,
+            countryOfOrigin: $country
+            ${genreQuery}
+            , sort: POPULARITY_DESC,
             format_in: [MANGA, NOVEL, ONE_SHOT]
           ) {
             id
@@ -167,7 +169,14 @@ export async function getAnilistPopularManga(genre: string = "Semua"): Promise<a
         }
       }
     `;
-    const data = await fetchAnilist(gqlQuery, { country: countryCode, genre: genreVariable });
+
+    // 3. Hanya kirim variabel genre jika genre bukan "Semua"
+    const variables = { 
+      country: countryCode, 
+      ...(genre !== "Semua" && { genre: [genre] }) 
+    };
+
+    const data = await fetchAnilist(gqlQuery, variables);
     return data?.Page?.media || [];
   };
 
